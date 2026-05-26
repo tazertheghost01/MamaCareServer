@@ -1,0 +1,551 @@
+MAMACARE BACKEND BUILD GUIDE (STEP BY STEP, PRO GRADE)
+Project: Backend (1)/Backend
+Date: 2026-05-25
+
+====================================================================
+0) WHAT YOU ALREADY HAVE (GOOD START)
+====================================================================
+- JWT auth foundation exists:
+  - /api/v1/auth/register
+  - /api/v1/auth/authenticate
+  - /api/v1/auth/refresh-token
+  - /api/v1/auth/logout
+- Role/permission security exists in SecurityConfiguration.
+- Build is stabilized (Lombok + filename mismatch fixed).
+
+What is still missing:
+- App-level domain for pregnancy journey:
+  - profile, onboarding, due date/LMP, home summary, reminders, learn content
+- API contracts that match your frontend screens.
+- Validation, error model, and endpoint consistency for mobile integration.
+
+====================================================================
+1) FRONTEND TEXT -> BACKEND MAPPING (EXACT FLOW)
+====================================================================
+Use this mapping so frontend can call the correct endpoint at each screen.
+
+1. "Get Started" / "Create your account"
+   - API: POST /api/v1/auth/register
+   - Backend receives: full name, email, phone, password, confirmPassword, acceptedTerms
+   - Backend returns: access_token, refresh_token, user summary
+
+2. "Already have an account? Log in"
+   - API: POST /api/v1/auth/authenticate
+   - Backend receives: emailOrPhone, password
+   - Backend returns: access_token, refresh_token, user summary
+
+3. "Choose your preferred language"
+   - API: PATCH /api/v1/users/me/preferences/language
+   - Backend receives: language (ENGLISH, PIDGIN, YORUBA, HAUSA, IGBO)
+   - Backend returns: updated language + success message
+
+4. "How would you like to set your date?"
+   - API: POST /api/v1/pregnancy/setup
+   - Mode A: dueDate
+   - Mode B: lastMenstrualPeriod
+   - Backend calculates and stores due date + pregnancy week reference
+
+5. "When is baby coming?" + "Start My Journey"
+   - API: POST /api/v1/pregnancy/setup (same endpoint, source tracked)
+   - Backend returns current week, trimester, daysToGo
+
+6. Home screen:
+   - "You are 24 weeks pregnant"
+   - "2nd trimester . 112 days to go"
+   - "Today's Reminders"
+   - "Learn & Listen"
+   - API: GET /api/v1/home/summary
+   - Backend returns one payload with all those sections
+
+7. "Today reminders View All"
+   - API: GET /api/v1/reminders?date=today
+   - API: POST /api/v1/reminders
+   - API: PATCH /api/v1/reminders/{id}
+
+8. "Learn & Listen View All"
+   - API: GET /api/v1/learn?language=PIDGIN&week=24
+
+====================================================================
+2) TARGET PACKAGE STRUCTURE
+====================================================================
+Keep your existing base package for speed:
+com.Mamacare.Backend.AuthenticationPackage
+
+Add these packages:
+
+com.Mamacare.Backend.AuthenticationPackage.shared
+  - BaseEntity.java
+  - ApiExceptionHandler.java
+  - ApiErrorCode.java
+
+com.Mamacare.Backend.AuthenticationPackage.userprofile
+  - PreferredLanguage.java
+  - UserProfile.java
+  - UserProfileRepository.java
+  - UserProfileService.java
+  - UserProfileController.java
+  - dto/UpdateLanguageRequest.java
+  - dto/UserProfileResponse.java
+
+com.Mamacare.Backend.AuthenticationPackage.pregnancy
+  - PregnancyDateSource.java
+  - PregnancyProfile.java
+  - PregnancyProfileRepository.java
+  - PregnancyCalculator.java
+  - PregnancyService.java
+  - PregnancyController.java
+  - dto/PregnancySetupRequest.java
+  - dto/PregnancySetupResponse.java
+
+com.Mamacare.Backend.AuthenticationPackage.reminder
+  - ReminderType.java
+  - ReminderStatus.java
+  - Reminder.java
+  - ReminderRepository.java
+  - ReminderService.java
+  - ReminderController.java
+  - dto/ReminderCreateRequest.java
+  - dto/ReminderResponse.java
+
+com.Mamacare.Backend.AuthenticationPackage.learn
+  - LearnCategory.java
+  - LearnContent.java
+  - LearnContentRepository.java
+  - LearnService.java
+  - LearnController.java
+  - dto/LearnCardResponse.java
+
+com.Mamacare.Backend.AuthenticationPackage.home
+  - HomeService.java
+  - HomeController.java
+  - dto/HomeSummaryResponse.java
+
+====================================================================
+3) STEP-BY-STEP IMPLEMENTATION PLAN
+====================================================================
+
+STEP 1: LOCK API CONTRACTS FIRST
+Why:
+- Mobile team needs stable request/response shapes before full implementation.
+
+Create:
+- docs/api-contracts-v1.md (or keep in OpenAPI annotations).
+
+Minimum contract decision:
+- Use snake_case for JSON keys if your mobile app expects that.
+- Keep endpoint versioning at /api/v1.
+
+Tradeoff:
+- snake_case is mobile-friendly and explicit.
+- camelCase is default in Java/Jackson and simpler server-side.
+- Pick one now and stay consistent.
+
+--------------------------------------------------------------------
+STEP 2: USER PROFILE (LANGUAGE + PHONE + TERMS)
+--------------------------------------------------------------------
+Why:
+- Your auth User currently has email/password/role only.
+- UI needs phone, language, and onboarding state.
+
+Key entity:
+
+public enum PreferredLanguage {
+  ENGLISH, PIDGIN, YORUBA, HAUSA, IGBO
+}
+
+@Entity
+@Table(name = "user_profiles")
+public class UserProfile extends BaseEntity {
+  @Id @GeneratedValue
+  private Long id;
+
+  @OneToOne(optional = false)
+  @JoinColumn(name = "user_id", unique = true)
+  private User user;
+
+  @Column(nullable = false, unique = true, length = 20)
+  private String phoneNumber;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private PreferredLanguage preferredLanguage = PreferredLanguage.ENGLISH;
+
+  @Column(nullable = false)
+  private boolean termsAccepted;
+}
+
+Annotations explained:
+- @OneToOne: one app user has one profile.
+- @Enumerated(EnumType.STRING): stores readable values like "PIDGIN", safer than ordinal.
+- @Column(unique=true): prevents duplicate phone registration.
+
+Tradeoff:
+- Keeping profile in separate table avoids risky auth table changes now.
+- Joining tables has slight query overhead, but cleaner long-term model.
+
+Controller endpoint:
+- PATCH /api/v1/users/me/preferences/language
+
+Validation DTO:
+- @NotNull PreferredLanguage language
+
+--------------------------------------------------------------------
+STEP 3: PREGNANCY SETUP (DUE DATE OR LMP)
+--------------------------------------------------------------------
+Why:
+- Screens: "I know my due date" or "I know my last menstrual period".
+
+Core enums/entity:
+
+public enum PregnancyDateSource {
+  DUE_DATE, LMP
+}
+
+@Entity
+@Table(name = "pregnancy_profiles")
+public class PregnancyProfile extends BaseEntity {
+  @Id @GeneratedValue
+  private Long id;
+
+  @OneToOne(optional = false)
+  @JoinColumn(name = "user_id", unique = true)
+  private User user;
+
+  @Column(nullable = false)
+  private LocalDate dueDate;
+
+  @Column(nullable = false)
+  private LocalDate lastMenstrualPeriod;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 12)
+  private PregnancyDateSource source;
+}
+
+Calculator rules:
+- If dueDate provided: lmp = dueDate.minusDays(280)
+- If lmp provided: dueDate = lmp.plusDays(280)
+- week = floor(daysBetween(lmp, today)/7) + 1
+- trimester:
+  - 1..13 -> "1st trimester"
+  - 14..27 -> "2nd trimester"
+  - 28..42 -> "3rd trimester"
+
+Request DTO:
+public class PregnancySetupRequest {
+  @NotNull PregnancyDateSource source;
+  LocalDate dueDate;
+  LocalDate lastMenstrualPeriod;
+}
+
+Validation rule:
+- source=DUE_DATE => dueDate required, lmp must be null
+- source=LMP => lastMenstrualPeriod required, dueDate must be null
+
+Best practice:
+- Put this cross-field validation in service layer plus bean validation where possible.
+
+--------------------------------------------------------------------
+STEP 4: HOME SUMMARY API (ONE CALL FOR HOME SCREEN)
+--------------------------------------------------------------------
+Why:
+- Mobile home screen has many widgets; one aggregated response reduces latency.
+
+Endpoint:
+- GET /api/v1/home/summary
+
+Response shape:
+{
+  "greeting": "Good morning, Ibukun!",
+  "pregnancy": {
+    "week": 24,
+    "trimester": "2nd trimester",
+    "days_to_go": 112
+  },
+  "audio_update": {
+    "title": "Listen to your weekly update",
+    "language": "PIDGIN",
+    "duration_seconds": 75
+  },
+  "today_reminders": [...],
+  "learn_cards": [...]
+}
+
+Tradeoff:
+- Aggregation endpoint is fast for frontend integration.
+- But backend service becomes orchestration-heavy. Keep logic modular per domain service.
+
+--------------------------------------------------------------------
+STEP 5: REMINDERS MODULE
+--------------------------------------------------------------------
+Why:
+- UI shows appointment, medication, walk reminders.
+
+Entity:
+
+public enum ReminderType { APPOINTMENT, MEDICATION, WALK, CHECKUP }
+public enum ReminderStatus { ACTIVE, DONE, SKIPPED }
+
+@Entity
+@Table(name = "reminders")
+public class Reminder extends BaseEntity {
+  @Id @GeneratedValue
+  private Long id;
+
+  @ManyToOne(optional = false)
+  @JoinColumn(name = "user_id")
+  private User user;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private ReminderType type;
+
+  @Column(nullable = false, length = 120)
+  private String title;
+
+  @Column(nullable = false)
+  private LocalDateTime remindAt;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private ReminderStatus status = ReminderStatus.ACTIVE;
+}
+
+Endpoints:
+- POST /api/v1/reminders
+- GET /api/v1/reminders?date=2026-05-25
+- PATCH /api/v1/reminders/{id}/status
+
+Security rule:
+- Always query reminders by authenticated user id.
+- Never fetch by id only (avoids BOLA/IDOR class of bugs).
+
+--------------------------------------------------------------------
+STEP 6: LEARN CONTENT MODULE
+--------------------------------------------------------------------
+Why:
+- UI has localized audio/learn cards per pregnancy stage.
+
+Entity:
+- title
+- category (NUTRITION, STRESS, DANGER_SIGNS, DELIVERY, EXERCISE)
+- language
+- weekMin/weekMax
+- durationSeconds
+- audioUrl
+- active
+
+Endpoint:
+- GET /api/v1/learn?language=PIDGIN&week=24
+
+Tradeoff:
+- DB-driven content allows admin updates without app release.
+- Static JSON files are faster initially, but harder to manage at scale.
+
+--------------------------------------------------------------------
+STEP 7: VALIDATION + ERROR MODEL (PRODUCTION GRADE)
+--------------------------------------------------------------------
+Why:
+- Mobile app needs predictable error messages and codes.
+
+Use:
+- @Valid in controllers
+- jakarta validation annotations in DTOs
+- global @RestControllerAdvice
+- ProblemDetail response format
+
+Example response:
+{
+  "type": "https://mamacare.dev/problems/validation",
+  "title": "Validation failed",
+  "status": 400,
+  "detail": "phoneNumber must be a valid Nigerian number",
+  "code": "VALIDATION_ERROR"
+}
+
+Annotations to know:
+- @Valid: triggers bean validation.
+- @RestControllerAdvice: global exception mapping.
+- @ExceptionHandler: handles specific exception types.
+
+Tradeoff:
+- Centralized error handling reduces duplicated try/catch.
+- Requires discipline so services throw meaningful exceptions.
+
+--------------------------------------------------------------------
+STEP 8: SECURITY HARDENING CHECKLIST (MUST DO)
+--------------------------------------------------------------------
+1. Keep bcrypt password hashing (already good).
+2. Do not expose internal ids in unsafe ways.
+3. Add login/register rate limiting.
+4. Validate all date and phone inputs.
+5. Return generic auth failure messages ("Invalid credentials").
+6. Keep JWT secret out of repo (env vars, not hardcoded).
+7. Enforce ownership checks in every user-specific query.
+
+OWASP mapping:
+- API1: Broken Object Level Authorization -> solve with per-user ownership checks.
+- API3: Broken Object Property Level Authorization -> do not mass-bind sensitive fields.
+
+====================================================================
+4) EXACT ENDPOINT LIST (FRONTEND READY)
+====================================================================
+
+AUTH
+- POST /api/v1/auth/register
+- POST /api/v1/auth/authenticate
+- POST /api/v1/auth/refresh-token
+- POST /api/v1/auth/logout
+
+USER
+- GET   /api/v1/users/me
+- PATCH /api/v1/users/me/preferences/language
+
+PREGNANCY
+- POST /api/v1/pregnancy/setup
+- GET  /api/v1/pregnancy/me
+
+HOME
+- GET /api/v1/home/summary
+
+REMINDERS
+- POST  /api/v1/reminders
+- GET   /api/v1/reminders
+- PATCH /api/v1/reminders/{id}/status
+- DELETE /api/v1/reminders/{id}
+
+LEARN
+- GET /api/v1/learn
+
+====================================================================
+5) HOW THIS MAPS TO YOUR CURRENT FRONTEND WORDS
+====================================================================
+
+"Your trusted companion for a healthy pregnancy journey."
+- No backend call needed (static copy in app).
+
+"Choose your preferred language"
+- PATCH /api/v1/users/me/preferences/language
+
+"Create your account"
+- POST /api/v1/auth/register
+
+"Log in to continue your pregnancy journey"
+- POST /api/v1/auth/authenticate
+
+"How would you like to set your date?"
+- POST /api/v1/pregnancy/setup (source switch)
+
+"When is baby coming?"
+- POST /api/v1/pregnancy/setup (date submit)
+
+"You are 24 weeks pregnant"
+- GET /api/v1/home/summary -> pregnancy.week
+
+"2nd trimester . 112 days to go"
+- GET /api/v1/home/summary -> pregnancy.trimester + pregnancy.days_to_go
+
+"Today's Reminders"
+- GET /api/v1/home/summary and/or GET /api/v1/reminders?date=today
+
+"Learn & Listen"
+- GET /api/v1/home/summary learn_cards or GET /api/v1/learn
+
+====================================================================
+6) ANNOTATION QUICK REFERENCE (JUNIOR FRIENDLY)
+====================================================================
+
+@RestController
+- Marks a class as REST API controller.
+- Returns JSON directly.
+
+@RequestMapping("/api/v1/...")
+- Sets base URL path for controller methods.
+
+@PostMapping / @GetMapping / @PatchMapping / @DeleteMapping
+- Maps HTTP verb to method.
+
+@Valid
+- Runs validation rules on incoming DTO.
+
+@NotNull, @NotBlank, @Email, @Pattern, @Size
+- Input constraints for DTO fields.
+
+@Entity
+- Marks class as JPA database table model.
+
+@Table(name = "...")
+- Explicit table name.
+
+@Id + @GeneratedValue
+- Primary key and auto generation.
+
+@Enumerated(EnumType.STRING)
+- Save enum name in DB safely/readably.
+
+@ManyToOne / @OneToOne
+- Relationship mapping between entities.
+
+@JoinColumn(name = "...")
+- FK column config.
+
+@Service
+- Business logic layer.
+
+@Repository
+- Data access layer.
+
+@Transactional
+- Ensures DB operations complete together or roll back.
+
+====================================================================
+7) TRADEOFFS YOU SHOULD DECIDE NOW
+====================================================================
+
+1. Keep existing package naming (com.Mamacare...) vs rename to all-lowercase.
+- Keep now: faster delivery.
+- Rename now: cleaner Java standard, but touches many files.
+
+2. Separate User + UserProfile vs merge into one table.
+- Separate: cleaner domain, safer auth evolution.
+- Merge: fewer joins, faster initial coding.
+
+3. Single home summary endpoint vs many small endpoints.
+- Single: fewer mobile calls, easier UI assembly.
+- Many: simpler backend units, more network calls.
+
+4. DB-driven learn content vs static seeded list.
+- DB: dynamic admin updates.
+- Static: quickest MVP.
+
+====================================================================
+8) DELIVERY ORDER (FASTEST SAFE PATH)
+====================================================================
+Day 1:
+- UserProfile + language endpoint + /users/me
+
+Day 2:
+- Pregnancy setup + calculator + /pregnancy/me
+
+Day 3:
+- Reminder CRUD + today filter
+
+Day 4:
+- Learn content read API + home summary aggregator
+
+Day 5:
+- Validation/error hardening + integration tests + Swagger review
+
+====================================================================
+9) DEFINITION OF DONE (DON'T SHIP BEFORE THIS)
+====================================================================
+
+- Register/login works with email OR phone (as designed).
+- User can set language and pregnancy date source.
+- Home summary renders all cards in one response.
+- Reminder create/list/update works only for owner.
+- Learn content filtered by language + week.
+- Validation errors are readable and consistent.
+- No endpoint leaks another user's data.
+
+END OF GUIDE
