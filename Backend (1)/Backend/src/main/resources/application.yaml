@@ -3,8 +3,8 @@ spring:
     name: Backend
 
   datasource:
-    url: jdbc:postgresql://db.fqxqsaiitvezjzbjemoh.supabase.co:5432/postgres?sslmode=require
-    username: postgres
+    url: jdbc:postgresql://aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require
+    username: postgres.fqxqsaiitvezjzbjemoh
     password: ${SUPABASE_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
