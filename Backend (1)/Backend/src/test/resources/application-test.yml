@@ -1,0 +1,18 @@
+spring:
+  cloud:
+    gcp:
+      sql:
+        enabled: true
+        database-name: mamacare_db
+        instance-connection-name: mamacare-backend:africa-south1:mamacare-database
+  
+  datasource:
+    username: root
+    password: WajuDynamics1.
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.MySQLDialect
+    show-sql: true

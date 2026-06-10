@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3307/mamacare_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: WajuDynamics1.
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.MySQLDialect
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+# Keep your other settings below
+application:
+  security:
+    jwt:
+      secret-key: cnHInY4GRVqKLB1PetMHWdJcJpP0CBhZyBhA5giUByE=
+      expiration: 86400000
+      refresh-token:
+        expiration: 604800000
+cors:
+  allowed-origins:
+    - 'http://localhost:19006'        
+    - 'http://192.168.1.111:19006'      
+    - 'http://192.168.1.178:19006'      
+    - 'http://192.168.1.178:8081'       
