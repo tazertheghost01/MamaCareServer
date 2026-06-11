@@ -12,6 +12,20 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  mail:
+    host: smtp.zeptomail.com
+    port: 587
+    username: emailapikey
+    password: wSsVR61zqRXxXf90nDf+crw+mFtdVlOiRE0s3VOnv3D5F/mU9sdqxkTJV1fzSvkbQDNrFGZG8r1/nxdTgWAKh44lmV5TDyiF9mqRe1U4J3x17qnvhDzNWW5UmxWJKogIxgtsn2lpE8Aq+g==
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          ssl:
+            protocols: TLSv1.2
+
 
 # Keep your other settings below
 application:
@@ -22,8 +36,4 @@ application:
       refresh-token:
         expiration: 604800000
 cors:
-  allowed-origins:
-    - 'http://localhost:19006'        
-    - 'http://192.168.1.111:19006'      
-    - 'http://192.168.1.178:19006'      
-    - 'http://192.168.1.178:8081'       
+  allowed-origins: "http://localhost:19006,http://localhost:8081,http://192.168.1.111:19006,http://192.168.1.111:8081,http://192.168.1.178:19006,http://192.168.1.178:8081"
