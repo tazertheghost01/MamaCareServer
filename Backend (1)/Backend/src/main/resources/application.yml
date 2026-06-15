@@ -37,3 +37,16 @@ application:
         expiration: 604800000
 cors:
   allowed-origins: "http://localhost:19006,http://localhost:8081,http://192.168.1.111:19006,http://192.168.1.111:8081,http://192.168.1.178:19006,http://192.168.1.178:8081"
+
+community:
+  copy:
+    screen-title: "Community"
+    hero-message: "You are not alone, Mama!"
+    search-placeholder: "Search questions, topics or moms"
+    ask-question-label: "Ask a Question"
+    footer-title: "Be kind, be supportive, be you."
+    footer-body: "This is safe space for every mama."
+    tabs:
+      - "Discussion"
+      - "Groups"
+      - "Events"
