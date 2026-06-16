@@ -32,7 +32,7 @@ public class BabyGrowthService {
         "Your baby is growing beautifully!",
         new BabyGrowthResponse.AudioUpdate(
             DEFAULT_AUDIO_LANGUAGE,
-            "Listen in Yoruba",
+            "Listen English",
             AUDIO_DURATION_SECONDS,
             audioUrlForWeekAndLanguage(pregnancy.week(), DEFAULT_AUDIO_LANGUAGE)
         ),
