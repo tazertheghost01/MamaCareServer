@@ -1,3 +1,7 @@
+server:
+  port: 8080
+  address: 0.0.0.0
+
 spring:
   datasource:
     url: jdbc:mysql://127.0.0.1:3307/mamacare_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
@@ -36,7 +40,7 @@ application:
       refresh-token:
         expiration: 604800000
 cors:
-  allowed-origins: "http://localhost:19006,http://localhost:8081,http://192.168.1.111:19006,http://192.168.1.111:8081,http://192.168.1.178:19006,http://192.168.1.178:8081"
+  allowed-origins: "http://localhost:19006,http://localhost:8081,http://172.25.96.1:19006,http://172.25.96.1:8081,http://192.168.1.111:19006,http://192.168.1.111:8081,http://192.168.1.178:19006,http://192.168.1.178:8081"
 
 community:
   copy:

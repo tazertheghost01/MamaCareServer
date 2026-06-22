@@ -110,11 +110,15 @@ export default function SignUpScreen() {
       const data = await response.json();
 
       if (response.ok || response.status === 200 || response.status === 201) {
-        await SecureStore.setItemAsync("accessToken", data.accessToken);
-        await SecureStore.setItemAsync("refreshToken", data.refreshToken);
-        await SecureStore.setItemAsync("firstName", form.firstName.trim());
-        await SecureStore.setItemAsync("lastName", form.lastName.trim());
-        router.replace("/(onboarding)/welcome");
+        // Backend sends OTP to email, navigate to verification screen
+        router.push({
+          pathname: "/(auth)/verify-otp",
+          params: {
+            email: data.email || form.email.trim().toLowerCase(),
+            firstName: form.firstName.trim(),
+            lastName: form.lastName.trim(),
+          },
+        });
       } else if (response.status === 409) {
         setErrors({ email: "An account with this email already exists." });
         showToast("An account with this email already exists.");
