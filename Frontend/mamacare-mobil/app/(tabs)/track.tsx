@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
@@ -25,7 +25,7 @@ async function authHeaders() {
   };
 }
 
-const APPOINTMENT_TYPES = ["CHECKUP", "ULTRASOUND", "BLOOD_TEST", "DELIVERY", "FOLLOW_UP"];
+const APPOINTMENT_TYPES = ["ANTENATAL", "ULTRASOUND", "LAB_TEST", "DOCTOR_CONSULTATION", "VACCINATION", "OTHER"];
 const REMINDER_OFFSETS = ["PT_5_MINUTES", "PT_15_MINUTES", "PT_30_MINUTES", "PT_1_HOUR", "PT_1_DAY", "PT_3_DAYS"];
 const OFFSET_LABELS: Record<string, string> = {
   PT_5_MINUTES: "5 mins before",
@@ -37,6 +37,7 @@ const OFFSET_LABELS: Record<string, string> = {
 };
 
 export default function TrackScreen() {
+  const { action } = useLocalSearchParams<{ action?: string }>();
   const [activeTab, setActiveTab] = useState<"upcoming" | "completed">("upcoming");
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -50,7 +51,7 @@ export default function TrackScreen() {
     title: "",
     description: "",
     appointmentDate: "",
-    appointmentType: "CHECKUP",
+    appointmentType: "ANTENATAL",
     reminderOffset: "PT_1_DAY",
   });
 
@@ -66,7 +67,16 @@ export default function TrackScreen() {
 
   useEffect(() => {
     loadData();
-  }, []);
+    if (action === "add_appointment") {
+      setAddType("appointment");
+      setShowAddModal(true);
+      router.setParams({ action: "" }); // clear it so it doesn't reopen
+    } else if (action === "add_medication") {
+      setAddType("medication");
+      setShowAddModal(true);
+      router.setParams({ action: "" });
+    }
+  }, [action]);
 
   const loadData = async () => {
     setLoading(true);
@@ -97,26 +107,43 @@ export default function TrackScreen() {
       Alert.alert("Missing fields", "Please fill in title and date.");
       return;
     }
+    
+    // Parse "YYYY-MM-DDTHH:mm:ss" or just "YYYY-MM-DD"
+    let dateStr = apptForm.appointmentDate;
+    let timeStr = "09:00:00"; // default time if not provided
+    if (apptForm.appointmentDate.includes("T")) {
+      const parts = apptForm.appointmentDate.split("T");
+      dateStr = parts[0];
+      timeStr = parts[1].length === 5 ? parts[1] + ":00" : parts[1]; // Ensure HH:mm:ss
+    }
+
     try {
       const headers = await authHeaders();
-      const response = await fetch(`${BASE_URL}/api/v1/appointments/`, {
+      const response = await fetch(`${BASE_URL}/api/v1/appointments`, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          title: apptForm.title,
-          description: apptForm.description,
-          appointmentDate: apptForm.appointmentDate,
-          appointmentType: apptForm.appointmentType,
-          reminderOffsets: [apptForm.reminderOffset],
-          checklistItems: [],
+          appointment_type: apptForm.appointmentType,
+          appointment_date: dateStr,
+          appointment_time: timeStr,
+          location_name: apptForm.title, // backend doesn't have title, using location_name
+          notes: apptForm.description,
+          reminder_enabled: true,
+          reminder_offsets: [apptForm.reminderOffset],
         }),
       });
+
       if (response.ok || response.status === 201) {
         setShowAddModal(false);
-        setApptForm({ title: "", description: "", appointmentDate: "", appointmentType: "CHECKUP", reminderOffset: "PT_1_DAY" });
+        setApptForm({ title: "", description: "", appointmentDate: "", appointmentType: "ANTENATAL", reminderOffset: "PT_1_DAY" });
         loadData();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        Alert.alert("Failed to save", data.message || data.detail || `Server error (${response.status})`);
       }
-    } catch (e) {}
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to connect to server");
+    }
   };
 
   const handleAddMedication = async () => {
@@ -124,29 +151,40 @@ export default function TrackScreen() {
       Alert.alert("Missing fields", "Please fill in medication name and reminder time.");
       return;
     }
+
+    let timeStr = medForm.reminderTime;
+    if (timeStr.length === 5) timeStr += ":00"; // Ensure HH:mm:ss format
+
     try {
       const headers = await authHeaders();
-      const response = await fetch(`${BASE_URL}/api/v1/medications/`, {
+      const response = await fetch(`${BASE_URL}/api/v1/medications`, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          medicationName: medForm.medicationName,
-          dosage: medForm.dosage,
+          medicine_name: medForm.medicationName,
+          dose: medForm.dosage || "1 pill",
           frequency: medForm.frequency,
-          dosageUnit: "tablet",
-          quantity: parseInt(medForm.quantity) || 30,
-          prescribedDate: new Date().toISOString().split("T")[0],
-          reminderTime: medForm.reminderTime + ":00",
+          medication_time: timeStr,
+          start_date: new Date().toISOString().split("T")[0],
+          reminder_enabled: true,
+          reminder_offset: "PT_15_MINUTES",
           notes: medForm.notes,
         }),
       });
+
       if (response.ok || response.status === 201) {
         setShowAddModal(false);
         setMedForm({ medicationName: "", dosage: "", frequency: "DAILY", quantity: "", reminderTime: "", notes: "" });
         loadData();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        Alert.alert("Failed to save", data.message || data.detail || `Server error (${response.status})`);
       }
-    } catch (e) {}
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to connect to server");
+    }
   };
+
 
   const handleMarkMedTaken = async (medId: number) => {
     try {

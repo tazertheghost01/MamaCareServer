@@ -160,14 +160,16 @@ export default function ProfileScreen() {
               {loading ? (
                 <ActivityIndicator size="small" color="#2D7A4F" style={{ alignSelf: "flex-start", marginTop: 4 }} />
               ) : (
-                <Text style={{ fontSize: 13, color: "#2D7A4F", fontWeight: "600", marginTop: 2 }}>
-                  {pregnancy ? `${pregnancy.weeksOfPregnancy} weeks pregnant` : "Set up your pregnancy"}
+                <Text style={{ fontSize: 13, color: "#AAA", marginTop: 2 }}>
+                  {pregnancy ? `${pregnancy.week} weeks pregnant` : "Set up your pregnancy"}
                 </Text>
               )}
               {pregnancy && (
-                <Text style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
-                  {getTrimester(pregnancy.weeksOfPregnancy)} • Week {pregnancy.weeksOfPregnancy}
-                </Text>
+                <View style={{ backgroundColor: "#E8F5EE", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, alignSelf: "flex-start", marginTop: 8 }}>
+                  <Text style={{ color: "#2D7A4F", fontSize: 12, fontWeight: "700" }}>
+                    {getTrimester(pregnancy.week)} • Week {pregnancy.week}
+                  </Text>
+                </View>
               )}
             </View>
           </View>

@@ -76,38 +76,45 @@ export default function SignInScreen() {
         }),
       });
 
-      const data = await response.json();
+      // Safely parse JSON — Spring may return non-JSON on some errors
+      let data: any = {};
+      try { data = await response.json(); } catch (_) {}
+
+      // Helper: extract the real error message from Spring's response body
+      const errMsg = data.detail || data.message || data.error || "";
 
       if (response.ok || response.status === 200) {
-        // Save tokens securely
-        await SecureStore.setItemAsync("accessToken", data.accessToken);
-        await SecureStore.setItemAsync("refreshToken", data.refreshToken);
+        // Save tokens securely — backend uses snake_case JSON keys
+        await SecureStore.setItemAsync("accessToken", data.access_token);
+        await SecureStore.setItemAsync("refreshToken", data.refresh_token);
         router.replace("/(tabs)/home");
       } else if (response.status === 400) {
-        showToast(data.message || data.details || "Invalid request. Please check your details.");
+        showToast(errMsg || "Invalid request. Check your email and password format.");
       } else if (response.status === 401) {
         setErrors({ password: "Incorrect email or password." });
-        showToast("Incorrect email or password.");
+        showToast(errMsg || "Incorrect email or password.");
       } else if (response.status === 403) {
-        showToast("Access denied. Your account may be suspended. Contact support.");
+        showToast(errMsg || "Your account is disabled. Please contact support.");
       } else if (response.status === 404) {
-        setErrors({ email: "No account found with this email address." });
-        showToast("No account found with this email address.");
+        setErrors({ email: "No account found with this email." });
+        showToast(errMsg || "No account found with this email address.");
+      } else if (response.status === 409) {
+        showToast(errMsg || "Account conflict. Please try signing in instead.");
       } else if (response.status === 500) {
-        showToast("Server error. Please try again later.");
+        showToast("Server error. Please try again in a few moments.");
       } else {
-        showToast(data.message || data.error || "Something went wrong. Please try again.");
+        showToast(errMsg || `Error ${response.status}. Please try again.`);
       }
     } catch (error: any) {
-      if (
-        error.message?.includes("Network request failed") ||
-        error.message?.includes("fetch")
-      ) {
-        showToast("No connection. Please check your internet and try again.");
+      console.log("Sign-in error:", error);
+      if (error.message?.includes("Network request failed")) {
+        showToast("Cannot reach server. Check your Wi-Fi or mobile data.");
       } else if (error.message?.includes("timeout")) {
-        showToast("Request timed out. Please try again.");
+        showToast("Server took too long to respond. Try again.");
+      } else if (error.message?.includes("JSON")) {
+        showToast("Server returned an invalid response. Try again.");
       } else {
-        showToast("An unexpected error occurred. Please try again.");
+        showToast(`Sign-in failed: ${error.message || "Unknown error"}`);
       }
     } finally {
       setLoading(false);

@@ -1,46 +1,29 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, Image, TouchableOpacity,
-  ScrollView, Dimensions, Modal, Animated, Platform,
+  ScrollView, Dimensions, Modal, Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import * as Notifications from "expo-notifications";
-import * as Device from "expo-device";
+import { useTranslation } from "react-i18next";
+import { Audio } from "expo-av";
+import { languageMap, reverseLanguageMap, normalizeLangName } from "../i18n";
 
 const { width } = Dimensions.get("window");
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const LANGUAGES = ["English", "Pidgin", "Yoruba", "Hausa", "Igbo"];
 
-// ── Notifications setup ──────────────────────────────────
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+const FALLBACK_ITEMS = [
+  { id: "nutrition-fall", title: "Nutrition for you and baby", duration_seconds: 150, category: "NUTRITION" },
+  { id: "stress-fall", title: "Managing stress the healthy way", duration_seconds: 105, category: "WELLNESS" },
+  { id: "danger-fall", title: "Danger signs in pregnancy", duration_seconds: 90, category: "MEDICATION" },
+  { id: "prep-fall", title: "Preparing for your baby's delivery", duration_seconds: 95, category: "HOSPITAL_PREPARATION" },
+];
 
-async function registerForPushNotifications() {
-  if (!Device.isDevice) return;
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  let finalStatus = existing;
-  if (existing !== "granted") {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-  if (finalStatus !== "granted") return;
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-    });
-  }
-}
+
 
 // ── Helper: get auth headers ─────────────────────────────
 async function authHeaders() {
@@ -52,6 +35,7 @@ async function authHeaders() {
 }
 
 export default function HomeScreen() {
+  const { t, i18n } = useTranslation();
   const [selectedLang, setSelectedLang] = useState("English");
   const [menuVisible, setMenuVisible] = useState(false);
   const menuAnim = useRef(new Animated.Value(-300)).current;
@@ -67,15 +51,19 @@ export default function HomeScreen() {
   // Dashboard data from API
   const [nextAppointment, setNextAppointment] = useState<any>(null);
   const [todayMeds, setTodayMeds] = useState<any[]>([]);
-  const [learnItems, setLearnItems] = useState([
-    { title: "Nutrition for you and baby", duration: "2.30 min" },
-    { title: "Managing stress the healthy way", duration: "1.45 min" },
-    { title: "Danger signs in pregnancy", duration: "1.30 min" },
-    { title: "Preparing for your baby's delivery", duration: "1.35 min" },
-  ]);
+  const [learnItems, setLearnItems] = useState<any[]>(FALLBACK_ITEMS);
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  // Audio state
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const [weeklyAudioUrl, setWeeklyAudioUrl] = useState<string | null>(null);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return t("good_morning");
+    if (hour < 17) return t("good_afternoon");
+    return t("good_evening");
+  };
 
   // ── Load data ─────────────────────────────────────────
   useEffect(() => {
@@ -83,8 +71,29 @@ export default function HomeScreen() {
     loadPregnancyInfo();
     loadNextAppointment();
     loadTodayMeds();
-    registerForPushNotifications();
+    loadLanguageAndContent();
   }, []);
+
+  useEffect(() => {
+    const currentLangCode = i18n.language || "en";
+    const mappedName = reverseLanguageMap[currentLangCode] || "English";
+    setSelectedLang(mappedName);
+    loadLearnItems(currentLangCode);
+  }, [i18n.language]);
+
+  useEffect(() => {
+    if (pregnancyWeeks != null) {
+      loadWeeklyAudio(pregnancyWeeks, i18n.language || "en");
+    }
+  }, [pregnancyWeeks, i18n.language]);
+
+  useEffect(() => {
+    return sound
+      ? () => {
+          sound.unloadAsync();
+        }
+      : undefined;
+  }, [sound]);
 
   const loadUserData = async () => {
     const firstName = await SecureStore.getItemAsync("firstName");
@@ -98,7 +107,7 @@ export default function HomeScreen() {
       const response = await fetch(`${BASE_URL}/api/v1/pregnancy/me`, { headers });
       if (response.ok) {
         const data = await response.json();
-        setPregnancyWeeks(data.weeksOfPregnancy);
+        setPregnancyWeeks(data.week);
         // Calculate days to go from due date
         if (data.dueDate) {
           const due = new Date(data.dueDate);
@@ -107,7 +116,7 @@ export default function HomeScreen() {
           setDaysToGo(diff);
         }
         // Set trimester
-        const weeks = data.weeksOfPregnancy || 0;
+        const weeks = data.week || 0;
         if (weeks <= 12) setTrimester("1st Trimester");
         else if (weeks <= 26) setTrimester("2nd Trimester");
         else setTrimester("3rd Trimester");
@@ -141,6 +150,135 @@ export default function HomeScreen() {
     } catch (e) {}
   };
 
+  const loadLanguageAndContent = async () => {
+    try {
+      const headers = await authHeaders();
+      const response = await fetch(`${BASE_URL}/api/v1/preferences`, { headers });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.language) {
+          const mappedName = normalizeLangName(data.language);
+          const langCode = languageMap[mappedName] || "en";
+          if (i18n.language !== langCode) {
+            i18n.changeLanguage(langCode);
+          } else {
+            loadLearnItems(langCode);
+          }
+        } else {
+          loadLearnItems(i18n.language || "en");
+        }
+      } else {
+        loadLearnItems(i18n.language || "en");
+      }
+    } catch (e) {
+      console.log("Error loading preferences in home screen", e);
+      loadLearnItems(i18n.language || "en");
+    }
+  };
+
+  const loadLearnItems = async (langCode: string) => {
+    try {
+      const headers = await authHeaders();
+      const response = await fetch(`${BASE_URL}/api/v1/learn/tips?lang=${langCode}`, { headers });
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setLearnItems(data.slice(0, 4));
+        } else {
+          setLearnItems(FALLBACK_ITEMS);
+        }
+      } else {
+        setLearnItems(FALLBACK_ITEMS);
+      }
+    } catch (e) {
+      console.log("Error loading learn items in home screen", e);
+      setLearnItems(FALLBACK_ITEMS);
+    }
+  };
+
+  const loadWeeklyAudio = async (weeks: number, langCode: string) => {
+    try {
+      const headers = await authHeaders();
+      const response = await fetch(`${BASE_URL}/api/v1/pregnancy/weekly-audio?week=${weeks}&lang=${langCode}`, { headers });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.audio_url || data.audioUrl) {
+          setWeeklyAudioUrl(data.audio_url || data.audioUrl);
+        } else {
+          setWeeklyAudioUrl(null);
+        }
+      } else {
+        setWeeklyAudioUrl(null);
+      }
+    } catch (e) {
+      console.log("Error loading weekly audio url", e);
+      setWeeklyAudioUrl(null);
+    }
+  };
+
+  const handleLanguageChange = async (langName: string) => {
+    setSelectedLang(langName);
+    const langCode = languageMap[langName] || "en";
+    i18n.changeLanguage(langCode);
+    
+    try {
+      const headers = await authHeaders();
+      await fetch(`${BASE_URL}/api/v1/preferences`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ language: langName.toUpperCase() }),
+      });
+    } catch (e) {
+      console.log("Error updating language preference", e);
+    }
+  };
+
+  const playSound = async (audioUrl: string, id: string) => {
+    try {
+      if (sound) {
+        await sound.unloadAsync();
+      }
+      setPlayingAudioId(id);
+      const fullUrl = audioUrl.startsWith("http") ? audioUrl : `${BASE_URL}${audioUrl}`;
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: fullUrl },
+        { shouldPlay: true }
+      );
+      setSound(newSound);
+
+      newSound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && !status.isPlaying && status.didJustFinish) {
+          setPlayingAudioId(null);
+        }
+      });
+    } catch (e) {
+      console.log("Error playing sound", e);
+      setPlayingAudioId(null);
+    }
+  };
+
+  const pauseSound = async () => {
+    try {
+      if (sound) {
+        await sound.pauseAsync();
+        setPlayingAudioId(null);
+      }
+    } catch (e) {
+      console.log("Error pausing sound", e);
+    }
+  };
+
+  const handleWeeklyAudioPress = () => {
+    if (weeklyAudioUrl) {
+      const audioId = "weekly-update";
+      if (playingAudioId === audioId) {
+        pauseSound();
+      } else {
+        playSound(weeklyAudioUrl, audioId);
+      }
+    }
+  };
+
   // ── Menu ─────────────────────────────────────────────
   const openMenu = () => {
     setMenuVisible(true);
@@ -166,50 +304,53 @@ export default function HomeScreen() {
   };
 
   const MENU_ITEMS = [
-    { icon: "person-outline", label: "Me", onPress: () => { closeMenu(); router.push("/(tabs)/profile"); } },
-    { icon: "settings-outline", label: "Settings", onPress: () => { closeMenu(); } },
-    { icon: "help-circle-outline", label: "Help & Support", onPress: () => { closeMenu(); } },
-    { icon: "information-circle-outline", label: "About Us", onPress: () => { closeMenu(); } },
-    { icon: "log-out-outline", label: "Sign Out", onPress: handleSignOut, color: "#E53935" },
+    { icon: "person-outline", label: t("menu.me"), onPress: () => { closeMenu(); router.push("/(tabs)/profile"); } },
+    { icon: "settings-outline", label: t("menu.settings"), onPress: () => { closeMenu(); } },
+    { icon: "help-circle-outline", label: t("menu.help"), onPress: () => { closeMenu(); } },
+    { icon: "information-circle-outline", label: t("menu.about"), onPress: () => { closeMenu(); } },
+    { icon: "log-out-outline", label: t("menu.sign_out"), onPress: handleSignOut, color: "#E53935" },
   ];
 
   // ── Build reminders from API data ────────────────────
   const reminders = [
     nextAppointment ? {
       icon: "calendar-outline",
-      title: nextAppointment.title || "Appointment",
+      title: nextAppointment.title || t("appointment", "Appointment"),
       sub: nextAppointment.daysUntilAppointment != null
-        ? `In ${nextAppointment.daysUntilAppointment} days`
-        : "Upcoming",
+        ? `${t("in", "In")} ${nextAppointment.daysUntilAppointment} ${t("days", "days")}`
+        : t("upcoming", "Upcoming"),
       subColor: "#2D7A4F",
       bg: "#F0FAF4",
     } : {
       icon: "calendar-outline",
-      title: "Antenatal\nAppointment",
-      sub: "No upcoming",
+      title: t("antenatal_appointment"),
+      sub: t("no_upcoming"),
       subColor: "#2D7A4F",
       bg: "#F0FAF4",
     },
     todayMeds[0] ? {
       icon: "medical-outline",
-      title: todayMeds[0].medicationName || "Medication",
-      sub: todayMeds[0].reminderTime?.slice(0, 5) || "Today",
-      subSub: "Daily reminder",
+      title: todayMeds[0].medicationName || t("medication"),
+      sub: todayMeds[0].reminderTime?.slice(0, 5) || t("today", "Today"),
+      subSub: t("daily_reminder", "Daily reminder"),
       bg: "#FFF8F0",
     } : {
       icon: "medical-outline",
-      title: "Medication",
-      sub: "No meds today",
+      title: t("medication"),
+      sub: t("no_meds_today"),
       bg: "#FFF8F0",
     },
     {
       icon: "walk-outline",
-      title: "Daily Walk",
-      sub: "10 min",
-      subSub: "Lets move gently",
+      title: t("daily_walk"),
+      sub: t("ten_min"),
+      subSub: t("lets_move_gently"),
       bg: "#F0F4FF",
     },
   ];
+
+  const trimesterKey = trimester === "1st Trimester" ? "1st" : trimester === "2nd Trimester" ? "2nd" : trimester === "3rd Trimester" ? "3rd" : null;
+  const trimesterDisplay = trimesterKey ? t(`trimesters.${trimesterKey}` as any) : (trimester || "--");
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F8F8" }}>
@@ -241,7 +382,7 @@ export default function HomeScreen() {
                 <Ionicons name="person" size={26} color="#2D7A4F" />
               </View>
               <Text style={{ fontSize: 17, fontWeight: "800", color: "#111" }}>{userName}</Text>
-              <Text style={{ fontSize: 12, color: "#888", marginTop: 2 }}>MamaCare Member</Text>
+              <Text style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{t("menu.member")}</Text>
             </View>
 
             {MENU_ITEMS.map((item) => (
@@ -297,13 +438,13 @@ export default function HomeScreen() {
         {/* ── Greeting ── */}
         <View style={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12, backgroundColor: "#fff" }}>
           <Text style={{ fontSize: 22, fontWeight: "800", color: "#111" }}>
-            {greeting}, {userName}!
+            {getGreeting()}, {userName}!
           </Text>
         </View>
 
         {/* ── Pregnancy card ── */}
         <TouchableOpacity
-          onPress={() => router.push("/(tabs)/track")}
+          onPress={() => router.push("/baby-growth")}
           style={{
             marginHorizontal: 20, marginBottom: 16,
             backgroundColor: "#2D7A4F", borderRadius: 20,
@@ -315,32 +456,35 @@ export default function HomeScreen() {
           }}
         >
           <View style={{ flex: 1 }}>
-            <Text style={{ color: "#A8D8BC", fontSize: 12, marginBottom: 4 }}>You are</Text>
+            <Text style={{ color: "#A8D8BC", fontSize: 12, marginBottom: 4 }}>{t("you_are")}</Text>
             <Text style={{ color: "#fff", fontSize: 32, fontWeight: "800", lineHeight: 36 }}>
-              {pregnancyWeeks != null ? `${pregnancyWeeks} weeks` : "-- weeks"}
+              {pregnancyWeeks != null ? `${pregnancyWeeks} ${t("weeks")}` : `-- ${t("weeks")}`}
             </Text>
-            <Text style={{ color: "#A8D8BC", fontSize: 13, marginTop: 2 }}>Pregnant</Text>
+            <Text style={{ color: "#A8D8BC", fontSize: 13, marginTop: 2 }}>{t("pregnant")}</Text>
             <Text style={{ color: "#A8D8BC", fontSize: 11, marginTop: 4 }}>
-              {trimester || "--"} · {daysToGo != null ? `${daysToGo} days to go` : "-- days to go"}
+              {trimesterDisplay} · {daysToGo != null ? `${daysToGo} ${t("days_to_go")}` : `-- ${t("days_to_go")}`}
             </Text>
 
             {/* Audio pill */}
-            <TouchableOpacity style={{
-              marginTop: 12, backgroundColor: "rgba(255,255,255,0.15)",
-              borderRadius: 25, paddingHorizontal: 14, paddingVertical: 10,
-              flexDirection: "row", alignItems: "center", gap: 8,
-              alignSelf: "flex-start",
-            }}>
-              <Ionicons name="volume-medium-outline" size={16} color="#fff" />
+            <TouchableOpacity 
+              onPress={handleWeeklyAudioPress}
+              style={{
+                marginTop: 12, backgroundColor: "rgba(255,255,255,0.15)",
+                borderRadius: 25, paddingHorizontal: 14, paddingVertical: 10,
+                flexDirection: "row", alignItems: "center", gap: 8,
+                alignSelf: "flex-start",
+              }}
+            >
+              <Ionicons name={playingAudioId === "weekly-update" ? "pause" : "volume-medium-outline"} size={16} color="#fff" />
               <View>
                 <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600" }}>
-                  Listen to your weekly update
+                  {t("listen_weekly_update")}
                 </Text>
                 <Text style={{ color: "#A8D8BC", fontSize: 10 }}>
-                  In {selectedLang} · 1.25 min
+                  {t("in_lang_duration", { lang: selectedLang })}
                 </Text>
               </View>
-              <Ionicons name="play-circle-outline" size={22} color="#fff" />
+              <Ionicons name={playingAudioId === "weekly-update" ? "pause-circle" : "play-circle-outline"} size={22} color="#fff" />
             </TouchableOpacity>
           </View>
 
@@ -355,16 +499,22 @@ export default function HomeScreen() {
         {/* ── Today's Reminders ── */}
         <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: "#111" }}>Today's Reminders</Text>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: "#111" }}>{t("todays_reminders")}</Text>
             <TouchableOpacity onPress={() => router.push("/(tabs)/track")}>
-              <Text style={{ color: "#2D7A4F", fontWeight: "600", fontSize: 13 }}>View All</Text>
+              <Text style={{ color: "#2D7A4F", fontWeight: "600", fontSize: 13 }}>{t("view_all")}</Text>
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
             {reminders.map((r: any, i: number) => (
               <TouchableOpacity
                 key={i}
-                onPress={() => router.push("/(tabs)/track")}
+                onPress={() => {
+                  if (r.title === t("daily_walk")) {
+                    router.push("/walk");
+                  } else {
+                    router.push("/(tabs)/track");
+                  }
+                }}
                 style={{
                   width: 120, backgroundColor: "#fff", borderRadius: 16,
                   padding: 14, alignItems: "center",
@@ -397,6 +547,22 @@ export default function HomeScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+
+          {/* Quick Add Buttons */}
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
+            <TouchableOpacity 
+              onPress={() => router.push({ pathname: "/(tabs)/track", params: { action: "add_appointment" } })}
+              style={{ flex: 1, backgroundColor: "#E8F5EE", paddingVertical: 12, borderRadius: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}>
+              <Ionicons name="calendar-outline" size={16} color="#2D7A4F" />
+              <Text style={{ color: "#2D7A4F", fontWeight: "700", fontSize: 13 }}>+ Appointment</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => router.push({ pathname: "/(tabs)/track", params: { action: "add_medication" } })}
+              style={{ flex: 1, backgroundColor: "#FFF8F0", paddingVertical: 12, borderRadius: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}>
+              <Ionicons name="medical-outline" size={16} color="#D68000" />
+              <Text style={{ color: "#D68000", fontWeight: "700", fontSize: 13 }}>+ Medication</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* ── Listen in your language ── */}
@@ -414,15 +580,15 @@ export default function HomeScreen() {
               <Ionicons name="volume-medium-outline" size={20} color="#2D7A4F" />
             </View>
             <View>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: "#111" }}>Listen in your language</Text>
-              <Text style={{ fontSize: 11, color: "#888" }}>Choose your preferred language for audio content.</Text>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: "#111" }}>{t("listen_in_your_language")}</Text>
+              <Text style={{ fontSize: 11, color: "#888" }}>{t("choose_lang_desc")}</Text>
             </View>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
             {LANGUAGES.map((lang) => (
               <TouchableOpacity
                 key={lang}
-                onPress={() => setSelectedLang(lang)}
+                onPress={() => handleLanguageChange(lang)}
                 style={{
                   paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
                   backgroundColor: selectedLang === lang ? "#2D7A4F" : "#F5F5F5",
@@ -439,45 +605,65 @@ export default function HomeScreen() {
         {/* ── Learn & Listen ── */}
         <View style={{ paddingHorizontal: 20 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: "#111" }}>Learn & Listen</Text>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: "#111" }}>{t("learn_and_listen")}</Text>
             <TouchableOpacity onPress={() => router.push("/(tabs)/learn")}>
-              <Text style={{ color: "#2D7A4F", fontWeight: "600", fontSize: 13 }}>View All</Text>
+              <Text style={{ color: "#2D7A4F", fontWeight: "600", fontSize: 13 }}>{t("view_all")}</Text>
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-            {learnItems.map((item, i) => (
-              <TouchableOpacity
-                key={i}
-                onPress={() => router.push("/(tabs)/learn")}
-                style={{
-                  width: 130, backgroundColor: "#fff", borderRadius: 16, overflow: "hidden",
-                  shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
-                }}
-              >
-                <View style={{ height: 80, backgroundColor: "#E8F5EE", alignItems: "center", justifyContent: "center" }}>
-                  <Image
-                    source={require("../../assets/images/10.png")}
-                    style={{ width: "100%", height: "100%" }}
-                    resizeMode="cover"
-                  />
-                </View>
-                <View style={{ padding: 10 }}>
-                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#111", marginBottom: 6, lineHeight: 16 }}>
-                    {item.title}
-                  </Text>
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    <Text style={{ fontSize: 10, color: "#888" }}>{item.duration}</Text>
-                    <TouchableOpacity style={{
-                      width: 24, height: 24, borderRadius: 12,
-                      backgroundColor: "#2D7A4F", alignItems: "center", justifyContent: "center",
-                    }}>
-                      <Ionicons name="play" size={10} color="#fff" />
-                    </TouchableOpacity>
+            {learnItems.map((item, i) => {
+              const durationSecs = item.duration_seconds || item.durationSeconds || 75;
+              const mins = Math.floor(durationSecs / 60);
+              const secs = durationSecs % 60;
+              const formattedDuration = `${mins}.${secs < 10 ? '0' : ''}${secs} min`;
+              const audioUrl = item.audio_url || item.audioUrl;
+              const isPlaying = playingAudioId === item.id;
+
+              return (
+                <TouchableOpacity
+                  key={i}
+                  onPress={() => router.push("/(tabs)/learn")}
+                  style={{
+                    width: 130, backgroundColor: "#fff", borderRadius: 16, overflow: "hidden",
+                    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+                  }}
+                >
+                  <View style={{ height: 80, backgroundColor: "#E8F5EE", alignItems: "center", justifyContent: "center" }}>
+                    <Image
+                      source={require("../../assets/images/9.png")}
+                      style={{ width: "100%", height: "100%" }}
+                      resizeMode="cover"
+                    />
                   </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+                  <View style={{ padding: 10 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: "#111", marginBottom: 6, lineHeight: 16 }} numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <Text style={{ fontSize: 10, color: "#888" }}>{formattedDuration}</Text>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          if (audioUrl) {
+                            if (isPlaying) {
+                              pauseSound();
+                            } else {
+                              playSound(audioUrl, item.id);
+                            }
+                          }
+                        }}
+                        style={{
+                          width: 24, height: 24, borderRadius: 12,
+                          backgroundColor: "#2D7A4F", alignItems: "center", justifyContent: "center",
+                        }}
+                      >
+                        <Ionicons name={isPlaying ? "pause" : "play"} size={10} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
 

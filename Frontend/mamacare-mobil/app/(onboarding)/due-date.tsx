@@ -98,7 +98,7 @@ export default function DueDateScreen() {
         // Save pregnancy info locally
         await SecureStore.setItemAsync("dateMode", mode || "due_date");
         await SecureStore.setItemAsync("dateValue", date);
-        await SecureStore.setItemAsync("pregnancyWeeks", String(data.weeksOfPregnancy || 0));
+        await SecureStore.setItemAsync("pregnancyWeeks", String(data.week || 0));
         await SecureStore.setItemAsync("dueDate", data.dueDate || "");
       } else {
         // Save locally even if API fails — will sync later

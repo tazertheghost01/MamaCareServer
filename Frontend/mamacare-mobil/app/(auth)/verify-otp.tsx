@@ -84,29 +84,41 @@ export default function VerifyOtpScreen() {
         body: JSON.stringify({ email, otp: otpCode }),
       });
 
-      const data = await response.json();
+      // Safely parse JSON — Spring may return non-JSON on some errors
+      let data: any = {};
+      try { data = await response.json(); } catch (_) {}
+
+      const errMsg = data.detail || data.message || data.error || "";
 
       if (response.ok || response.status === 200) {
-        // Now we get the tokens
-        await SecureStore.setItemAsync("accessToken", data.accessToken);
-        await SecureStore.setItemAsync("refreshToken", data.refreshToken);
+        // Tokens received — save and go to onboarding (backend uses snake_case keys)
+        await SecureStore.setItemAsync("accessToken", data.access_token);
+        await SecureStore.setItemAsync("refreshToken", data.refresh_token);
         if (firstName) await SecureStore.setItemAsync("firstName", firstName);
         if (lastName) await SecureStore.setItemAsync("lastName", lastName);
         router.replace("/(onboarding)/welcome");
       } else if (response.status === 400) {
-        showToast(data.message || "Invalid or expired code. Please try again.");
+        showToast(errMsg || "Invalid or expired code. Go back and sign up again.");
       } else if (response.status === 409) {
-        showToast(data.message || "This account already exists.");
+        showToast(errMsg || "Account already verified. Redirecting to sign in...");
+        setTimeout(() => router.replace("/(auth)/sign-in"), 2000);
+      } else if (response.status === 404) {
+        showToast(errMsg || "No pending registration for this email. Sign up again.");
+      } else if (response.status === 500) {
+        showToast("Server error while creating account. Try again.");
       } else {
-        showToast(data.message || "Something went wrong. Please try again.");
+        showToast(errMsg || `Verification failed (error ${response.status}). Try again.`);
       }
     } catch (error: any) {
-      if (error.message?.includes("Network request failed") || error.message?.includes("fetch")) {
-        showToast("No connection. Please check your internet and try again.");
+      console.log("OTP verify error:", error);
+      if (error.message?.includes("Network request failed")) {
+        showToast("Cannot reach server. Check your Wi-Fi or mobile data.");
       } else if (error.message?.includes("timeout")) {
-        showToast("Request timed out. Please try again.");
+        showToast("Server took too long to respond. Try again.");
+      } else if (error.message?.includes("JSON")) {
+        showToast("Server returned an invalid response. Try again.");
       } else {
-        showToast("An unexpected error occurred. Please try again.");
+        showToast(`Verification failed: ${error.message || "Unknown error"}`);
       }
     } finally {
       setLoading(false);

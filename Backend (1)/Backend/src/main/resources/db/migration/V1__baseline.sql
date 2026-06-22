@@ -1,0 +1,15 @@
+-- V1__baseline.sql
+-- ============================================================
+-- This is the baseline migration. Since the database already
+-- exists (created by Hibernate ddl-auto: update), this file
+-- is intentionally empty.
+--
+-- Flyway will baseline at version 0 and record V1 as the
+-- first applied migration. All future schema changes should
+-- be added as new versioned migration files:
+--   V2__add_xyz_table.sql
+--   V3__alter_user_add_column.sql
+--   etc.
+-- ============================================================
+
+-- Nothing to do — existing schema is already in place.

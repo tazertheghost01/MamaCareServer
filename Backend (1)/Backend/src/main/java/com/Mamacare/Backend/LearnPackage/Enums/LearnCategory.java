@@ -5,5 +5,7 @@ public enum LearnCategory {
     NUTRITION,
     MEDICATION,
     BABY_GROWTH,
-    WELLNESS
+    WELLNESS,
+    EXERCISE,
+    HOSPITAL_PREPARATION
 }

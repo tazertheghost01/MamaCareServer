@@ -18,7 +18,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class UserPreferenceService {
 
-    private static final Set<String> SUPPORTED_LANGUAGES = Set.of("ENGLISH", "YORUBA", "PIDGIN", "HAUSA");
+    private static final Set<String> SUPPORTED_LANGUAGES = Set.of("ENGLISH", "YORUBA", "PIDGIN", "HAUSA", "IGBO");
 
     private final UserPreferenceRepo preferenceRepository;
 
@@ -83,7 +83,7 @@ public class UserPreferenceService {
     private String normalizeLanguage(String language) {
         String normalized = language.trim().toUpperCase(Locale.ENGLISH);
         if (!SUPPORTED_LANGUAGES.contains(normalized)) {
-            throw new IllegalArgumentException("Unsupported language. Use ENGLISH, YORUBA, PIDGIN, or HAUSA.");
+            throw new IllegalArgumentException("Unsupported language. Use ENGLISH, YORUBA, PIDGIN, HAUSA, or IGBO.");
         }
         return normalized;
     }

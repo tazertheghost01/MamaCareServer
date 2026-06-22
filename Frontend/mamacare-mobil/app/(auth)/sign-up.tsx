@@ -107,10 +107,13 @@ export default function SignUpScreen() {
         }),
       });
 
-      const data = await response.json();
+      // Safely parse JSON — Spring may return non-JSON on some errors
+      let data: any = {};
+      try { data = await response.json(); } catch (_) {}
+
+      const errMsg = data.detail || data.message || data.error || "";
 
       if (response.ok || response.status === 200 || response.status === 201) {
-        // Backend sends OTP to email, navigate to verification screen
         router.push({
           pathname: "/(auth)/verify-otp",
           params: {
@@ -120,22 +123,25 @@ export default function SignUpScreen() {
           },
         });
       } else if (response.status === 409) {
-        setErrors({ email: "An account with this email already exists." });
-        showToast("An account with this email already exists.");
+        setErrors({ email: errMsg || "An account with this email already exists." });
+        showToast(errMsg || "An account with this email already exists. Try signing in.");
       } else if (response.status === 400) {
-        showToast(data.message || data.details || "Invalid details. Please check your information.");
+        showToast(errMsg || "Invalid details. Check your name, email and password.");
       } else if (response.status === 500) {
-        showToast("Server error. Please try again later.");
+        showToast("Server error. Could not send verification email. Try again.");
       } else {
-        showToast(data.message || "Something went wrong. Please try again.");
+        showToast(errMsg || `Sign-up failed (error ${response.status}). Try again.`);
       }
     } catch (error: any) {
-      if (error.message?.includes("Network request failed") || error.message?.includes("fetch")) {
-        showToast("No connection. Please check your internet and try again.");
+      console.log("Sign-up error:", error);
+      if (error.message?.includes("Network request failed")) {
+        showToast("Cannot reach server. Check your Wi-Fi or mobile data.");
       } else if (error.message?.includes("timeout")) {
-        showToast("Request timed out. Please try again.");
+        showToast("Server took too long to respond. Try again.");
+      } else if (error.message?.includes("JSON")) {
+        showToast("Server returned an invalid response. Try again.");
       } else {
-        showToast("An unexpected error occurred. Please try again.");
+        showToast(`Sign-up failed: ${error.message || "Unknown error"}`);
       }
     } finally {
       setLoading(false);
