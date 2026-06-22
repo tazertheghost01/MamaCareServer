@@ -51,6 +51,29 @@ async function authHeaders() {
   };
 }
 
+const LEARN_ITEMS = [
+  {
+    title: "Nutrition for you and baby",
+    duration: "2.30 min",
+    image: require("../../assets/images/9.png"),
+  },
+  {
+    title: "Managing stress the healthy way",
+    duration: "1.45 min",
+    image: require("../../assets/images/11.png"),
+  },
+  {
+    title: "Danger signs in pregnancy",
+    duration: "1.30 min",
+    image: require("../../assets/images/12.png"),
+  },
+  {
+    title: "Preparing for your baby's delivery",
+    duration: "1.35 min",
+    image: require("../../assets/images/7.png"),
+  },
+];
+
 export default function HomeScreen() {
   const [selectedLang, setSelectedLang] = useState("English");
   const [menuVisible, setMenuVisible] = useState(false);
@@ -67,12 +90,6 @@ export default function HomeScreen() {
   // Dashboard data from API
   const [nextAppointment, setNextAppointment] = useState<any>(null);
   const [todayMeds, setTodayMeds] = useState<any[]>([]);
-  const [learnItems, setLearnItems] = useState([
-    { title: "Nutrition for you and baby", duration: "2.30 min" },
-    { title: "Managing stress the healthy way", duration: "1.45 min" },
-    { title: "Danger signs in pregnancy", duration: "1.30 min" },
-    { title: "Preparing for your baby's delivery", duration: "1.35 min" },
-  ]);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -99,21 +116,18 @@ export default function HomeScreen() {
       if (response.ok) {
         const data = await response.json();
         setPregnancyWeeks(data.weeksOfPregnancy);
-        // Calculate days to go from due date
         if (data.dueDate) {
           const due = new Date(data.dueDate);
           const today = new Date();
           const diff = Math.max(0, Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
           setDaysToGo(diff);
         }
-        // Set trimester
         const weeks = data.weeksOfPregnancy || 0;
         if (weeks <= 12) setTrimester("1st Trimester");
         else if (weeks <= 26) setTrimester("2nd Trimester");
         else setTrimester("3rd Trimester");
       }
     } catch (e) {
-      // Use locally stored data as fallback
       const stored = await SecureStore.getItemAsync("pregnancyWeeks");
       if (stored) setPregnancyWeeks(parseInt(stored));
     }
@@ -344,7 +358,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Baby image*/}
+          {/* Baby image */}
           <Image
             source={require("../../assets/images/8.png")}
             style={{ width: 100, height: 130, marginTop: -18 }}
@@ -356,7 +370,7 @@ export default function HomeScreen() {
         <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <Text style={{ fontSize: 16, fontWeight: "700", color: "#111" }}>Today's Reminders</Text>
-            <TouchableOpacity onPress={() => router.push("/(tabs)/track")}>
+            <TouchableOpacity onPress={() => router.push("/(tabs)/reminders" as any)}>
               <Text style={{ color: "#2D7A4F", fontWeight: "600", fontSize: 13 }}>View All</Text>
             </TouchableOpacity>
           </View>
@@ -364,7 +378,7 @@ export default function HomeScreen() {
             {reminders.map((r: any, i: number) => (
               <TouchableOpacity
                 key={i}
-                onPress={() => router.push("/(tabs)/track")}
+                onPress={() => router.push("/(tabs)/reminders" as any)}
                 style={{
                   width: 120, backgroundColor: "#fff", borderRadius: 16,
                   padding: 14, alignItems: "center",
@@ -445,7 +459,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-            {learnItems.map((item, i) => (
+            {LEARN_ITEMS.map((item, i) => (
               <TouchableOpacity
                 key={i}
                 onPress={() => router.push("/(tabs)/learn")}
@@ -455,9 +469,9 @@ export default function HomeScreen() {
                   shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
                 }}
               >
-                <View style={{ height: 80, backgroundColor: "#E8F5EE", alignItems: "center", justifyContent: "center" }}>
+                <View style={{ height: 80, backgroundColor: "#E8F5EE" }}>
                   <Image
-                    source={require("../../assets/images/10.png")}
+                    source={item.image}
                     style={{ width: "100%", height: "100%" }}
                     resizeMode="cover"
                   />
