@@ -81,7 +81,7 @@ export default function ProfileScreen() {
       iconColor: "#2D7A4F",
       title: "Reminders",
       desc: "Manage your reminders",
-      onPress: () => router.push("../(tabs)/track"),
+      onPress: () => router.push("../(profile)/reminders"),
     },
   ];
 
@@ -94,14 +94,16 @@ export default function ProfileScreen() {
       desc: "Notifications, language & privacy",
       onPress: () => router.push("/(profile)/settings"),
     },
-    {
-      icon: "help-circle-outline",
-      color: "#E8F5EE",
-      iconColor: "#2D7A4F",
-      title: "Help & Support",
-      desc: "Get help & support",
-      onPress: () => router.push("/(profile)/about"),
-    },
+
+      {
+        icon: "help-circle-outline",
+        color: "#E8F5EE",
+        iconColor: "#2D7A4F",
+        title: "Help & Support",
+        desc: "Get help & support",
+        onPress: () => router.push("/(profile)/help"),
+},
+
     {
       icon: "information-circle-outline",
       color: "#E8F5EE",
