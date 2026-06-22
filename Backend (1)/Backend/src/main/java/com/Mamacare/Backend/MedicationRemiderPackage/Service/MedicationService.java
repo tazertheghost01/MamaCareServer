@@ -3,9 +3,11 @@ package com.Mamacare.Backend.MedicationRemiderPackage.Service;
 import com.Mamacare.Backend.AuthenticationPackage.user.User;
 import com.Mamacare.Backend.MedicationRemiderPackage.DTOs.CreateMedicationRequest;
 import com.Mamacare.Backend.MedicationRemiderPackage.DTOs.MarkMedicationTakenResponse;
+import com.Mamacare.Backend.MedicationRemiderPackage.DTOs.MedicationIntakeHistoryResponse;
 import com.Mamacare.Backend.MedicationRemiderPackage.DTOs.MedicationHomeResponse;
 import com.Mamacare.Backend.MedicationRemiderPackage.DTOs.MedicationReminderResponse;
 import com.Mamacare.Backend.MedicationRemiderPackage.DTOs.MedicationResponse;
+import com.Mamacare.Backend.MedicationRemiderPackage.DTOs.UpdateMedicationRequest;
 import com.Mamacare.Backend.MedicationRemiderPackage.Entity.Medication;
 import com.Mamacare.Backend.MedicationRemiderPackage.Entity.MedicationIntakeLog;
 import com.Mamacare.Backend.MedicationRemiderPackage.Entity.MedicationReminder;
@@ -109,6 +111,58 @@ public class MedicationService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<MedicationIntakeHistoryResponse> getIntakeHistory(Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+        return intakeLogRepository.findByMedication_User_IdOrderByIntakeDateDesc(currentUser.getId())
+                .stream()
+                .map(this::toHistoryResponse)
+                .toList();
+    }
+
+    @Transactional
+    public MedicationResponse updateMedication(
+            Long medicationId,
+            UpdateMedicationRequest request,
+            Authentication authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        Medication medication = findMedicationOwnedByUser(medicationId, currentUser.getId());
+
+        if (request.getMedicineName() != null && !request.getMedicineName().isBlank()) {
+            medication.setMedicineName(request.getMedicineName().trim());
+        }
+        if (request.getDose() != null && !request.getDose().isBlank()) {
+            medication.setDose(request.getDose().trim());
+        }
+        if (request.getFrequency() != null) {
+            medication.setFrequency(request.getFrequency());
+        }
+        if (request.getMedicationTime() != null) {
+            medication.setMedicationTime(request.getMedicationTime());
+        }
+        if (request.getStartDate() != null) {
+            medication.setStartDate(request.getStartDate());
+        }
+        if (request.getTimezone() != null) {
+            medication.setTimezone(scheduleCalculator.normalizeTimezone(request.getTimezone()));
+        }
+        if (request.getReminderEnabled() != null) {
+            medication.setReminderEnabled(request.getReminderEnabled());
+        }
+        if (request.getReminderOffset() != null) {
+            medication.setReminderOffset(request.getReminderOffset());
+        }
+        if (request.getNotes() != null) {
+            medication.setNotes(normalizeText(request.getNotes()));
+        }
+
+        Medication savedMedication = medicationRepository.save(medication);
+        refreshPendingReminders(savedMedication);
+
+        return toResponse(savedMedication, loadTakenMedicationIdsForToday(List.of(savedMedication)));
+    }
+
     @Transactional
     public MarkMedicationTakenResponse markTaken(Long medicationId, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
@@ -152,6 +206,22 @@ public class MedicationService {
             }
         }
         reminderRepository.saveAll(reminders);
+    }
+
+    @Transactional
+    public MedicationResponse updateReminderEnabled(
+            Long medicationId,
+            boolean reminderEnabled,
+            Authentication authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        Medication medication = findMedicationOwnedByUser(medicationId, currentUser.getId());
+
+        medication.setReminderEnabled(reminderEnabled);
+        Medication savedMedication = medicationRepository.save(medication);
+        refreshPendingReminders(savedMedication);
+
+        return toResponse(savedMedication, loadTakenMedicationIdsForToday(List.of(savedMedication)));
     }
 
     private User getCurrentUser(Authentication authentication) {
@@ -208,6 +278,17 @@ public class MedicationService {
                 });
     }
 
+    private void refreshPendingReminders(Medication medication) {
+        List<MedicationReminder> reminders = reminderRepository.findByMedicationIdOrderByRemindAtAsc(medication.getId());
+        for (MedicationReminder reminder : reminders) {
+            if (reminder.getStatus() == MedicationReminderStatus.PENDING) {
+                reminder.setStatus(MedicationReminderStatus.CANCELLED);
+            }
+        }
+        reminderRepository.saveAll(reminders);
+        createNextReminderIfNeeded(medication);
+    }
+
     private Set<Long> loadTakenMedicationIdsForToday(List<Medication> medications) {
         if (medications.isEmpty()) {
             return Set.of();
@@ -262,6 +343,17 @@ public class MedicationService {
                 .reminderText(toReminderText(medication))
                 .takenToday(takenMedicationIds.contains(medication.getId()))
                 .reminders(reminders)
+                .build();
+    }
+
+    private MedicationIntakeHistoryResponse toHistoryResponse(MedicationIntakeLog log) {
+        return MedicationIntakeHistoryResponse.builder()
+                .id(log.getId())
+                .medicationId(log.getMedication().getId())
+                .medicineName(log.getMedication().getMedicineName())
+                .intakeDate(log.getIntakeDate())
+                .status(log.getStatus())
+                .recordedAt(log.getRecordedAt())
                 .build();
     }
 

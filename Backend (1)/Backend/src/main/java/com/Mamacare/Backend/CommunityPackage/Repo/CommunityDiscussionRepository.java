@@ -15,6 +15,10 @@ public interface CommunityDiscussionRepository extends JpaRepository<CommunityDi
       CommunityDiscussionStatus status
   );
 
+  long countByStatus(CommunityDiscussionStatus status);
+
+  List<CommunityDiscussion> findTop20ByOrderByCreatedAtDesc();
+
   @Query("""
       select d from CommunityDiscussion d
       join d.group g

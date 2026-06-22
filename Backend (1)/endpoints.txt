@@ -81,7 +81,107 @@ GET /api/v1/baby-growth/today
   Controller: BabyGrowthController.getToday
 
 ============================================================
-6. COMMUNITY / CHAT
+6. LEARN / HEALTH TIPS
+============================================================
+
+GET /api/v1/learn/home
+  Purpose: Get Learn screen data: tips of the day, weekly highlights, nutrition cards.
+  Auth: Required
+  Controller: LearnController.getHome
+
+GET /api/v1/learn/tips
+  Purpose: Get all learn/tip cards. Optional query: category=PREGNANCY_OVERVIEW|NUTRITION|MEDICATION|BABY_GROWTH|WELLNESS
+  Auth: Required
+  Controller: LearnController.getTips
+
+GET /api/v1/learn/tips/today
+  Purpose: Get daily tips for home screen.
+  Auth: Required
+  Controller: LearnController.getTipsOfTheDay
+
+============================================================
+7. DAILY GOALS
+============================================================
+
+GET /api/v1/daily-goals/today
+  Purpose: Get today's goals and progress.
+  Auth: Required
+  Controller: DailyGoalController.getToday
+
+POST /api/v1/daily-goals
+  Purpose: Create a custom daily goal.
+  Auth: Required
+  Controller: DailyGoalController.createGoal
+
+PATCH /api/v1/daily-goals/{goalId}
+  Purpose: Update a daily goal.
+  Auth: Required
+  Controller: DailyGoalController.updateGoal
+
+PATCH /api/v1/daily-goals/{goalId}/complete
+  Purpose: Mark a daily goal completed.
+  Auth: Required
+  Controller: DailyGoalController.markCompleted
+
+DELETE /api/v1/daily-goals/{goalId}
+  Purpose: Soft-delete a daily goal.
+  Auth: Required
+  Controller: DailyGoalController.deleteGoal
+
+============================================================
+8. PREFERENCES / NOTIFICATIONS
+============================================================
+
+GET /api/v1/preferences
+  Purpose: Get language, timezone, notification, reminder, and privacy preferences.
+  Auth: Required
+  Controller: UserPreferenceController.getPreferences
+
+PATCH /api/v1/preferences
+  Purpose: Update language, timezone, notification, reminder, and privacy preferences.
+  Auth: Required
+  Controller: UserPreferenceController.updatePreferences
+
+============================================================
+9. PROFILE
+============================================================
+
+GET /api/v1/profile
+  Purpose: Get current user's profile.
+  Auth: Required
+  Controller: ProfileController.getProfile
+
+PATCH /api/v1/profile
+  Purpose: Update fullname and phone number.
+  Auth: Required
+  Controller: ProfileController.updateProfile
+
+DELETE /api/v1/profile/account
+  Purpose: Disable current user's account.
+  Auth: Required
+  Controller: ProfileController.deactivateAccount
+
+============================================================
+10. HELP & SUPPORT
+============================================================
+
+GET /api/v1/support/home
+  Purpose: Get FAQ, contact info, and support actions.
+  Auth: Required
+  Controller: SupportController.getHome
+
+POST /api/v1/support/tickets
+  Purpose: Submit feedback, report issue, or contact support message.
+  Auth: Required
+  Controller: SupportController.createTicket
+
+GET /api/v1/support/tickets
+  Purpose: Get current user's support tickets.
+  Auth: Required
+  Controller: SupportController.getMyTickets
+
+============================================================
+11. COMMUNITY / CHAT
 ============================================================
 
 GET /api/v1/community/home
@@ -125,7 +225,7 @@ POST /api/v1/community/events/{eventId}/register
   Controller: CommunityController.registerForEvent
 
 ============================================================
-7. APPOINTMENTS
+12. APPOINTMENTS
 ============================================================
 
 POST /api/v1/appointments
@@ -138,13 +238,43 @@ GET /api/v1/appointments/upcoming/next
   Auth: Required
   Controller: AppointmentController.getNextAppointment
 
+GET /api/v1/appointments
+  Purpose: Get all current user's appointments.
+  Auth: Required
+  Controller: AppointmentController.getAllAppointments
+
+GET /api/v1/appointments/upcoming
+  Purpose: Get upcoming scheduled appointments.
+  Auth: Required
+  Controller: AppointmentController.getUpcomingAppointments
+
+GET /api/v1/appointments/completed
+  Purpose: Get completed appointments.
+  Auth: Required
+  Controller: AppointmentController.getCompletedAppointments
+
+PATCH /api/v1/appointments/{appointmentId}
+  Purpose: Update appointment details.
+  Auth: Required
+  Controller: AppointmentController.updateAppointment
+
+PATCH /api/v1/appointments/{appointmentId}/cancel
+  Purpose: Cancel appointment and pending reminders.
+  Auth: Required
+  Controller: AppointmentController.cancelAppointment
+
+PATCH /api/v1/appointments/{appointmentId}/complete
+  Purpose: Mark appointment completed and cancel pending reminders.
+  Auth: Required
+  Controller: AppointmentController.completeAppointment
+
 PATCH /api/v1/appointments/{appointmentId}/checklist/{itemId}
   Purpose: Update an appointment checklist item.
   Auth: Required
   Controller: AppointmentController.updateChecklistItem
 
 ============================================================
-8. MEDICATION REMINDER
+13. MEDICATION REMINDER
 ============================================================
 
 POST /api/v1/medications
@@ -162,6 +292,16 @@ GET /api/v1/medications
   Auth: Required
   Controller: MedicationController.getAllMedications
 
+GET /api/v1/medications/history
+  Purpose: Get medication intake history.
+  Auth: Required
+  Controller: MedicationController.getIntakeHistory
+
+PATCH /api/v1/medications/{medicationId}
+  Purpose: Update medication details.
+  Auth: Required
+  Controller: MedicationController.updateMedication
+
 PATCH /api/v1/medications/{medicationId}/taken
   Purpose: Mark medication as taken today.
   Auth: Required
@@ -172,8 +312,13 @@ PATCH /api/v1/medications/{medicationId}/inactive
   Auth: Required
   Controller: MedicationController.deactivateMedication
 
+PATCH /api/v1/medications/{medicationId}/reminder
+  Purpose: Turn medication reminders on/off.
+  Auth: Required
+  Controller: MedicationController.updateReminderEnabled
+
 ============================================================
-9. WALK / EXERCISE
+14. WALK / EXERCISE
 ============================================================
 
 GET /api/v1/walk-exercise/home
@@ -186,6 +331,11 @@ POST /api/v1/walk-exercise/sessions
   Auth: Required
   Controller: WalkExerciseController.startSession
 
+GET /api/v1/walk-exercise/sessions
+  Purpose: Get latest 20 walk sessions.
+  Auth: Required
+  Controller: WalkExerciseController.getSessionHistory
+
 PATCH /api/v1/walk-exercise/sessions/{sessionId}/metrics
   Purpose: Sync walk metrics while session is running.
   Auth: Required
@@ -196,8 +346,23 @@ PATCH /api/v1/walk-exercise/sessions/{sessionId}/complete
   Auth: Required
   Controller: WalkExerciseController.completeSession
 
+PATCH /api/v1/walk-exercise/sessions/{sessionId}/cancel
+  Purpose: Cancel walk session.
+  Auth: Required
+  Controller: WalkExerciseController.cancelSession
+
+GET /api/v1/walk-exercise/goal-setting
+  Purpose: Get walk daily goal settings.
+  Auth: Required
+  Controller: WalkExerciseController.getGoalSetting
+
+PATCH /api/v1/walk-exercise/goal-setting
+  Purpose: Update walk daily goal minutes and timezone.
+  Auth: Required
+  Controller: WalkExerciseController.updateGoalSetting
+
 ============================================================
-10. MANAGEMENT DEMO
+15. MANAGEMENT DEMO
 ============================================================
 
 GET /api/v1/management
@@ -221,7 +386,7 @@ DELETE /api/v1/management
   Controller: ManagementController.delete
 
 ============================================================
-11. ADMIN DEMO
+16. ADMIN DEMO
 ============================================================
 
 GET /api/v1/admin
@@ -245,7 +410,7 @@ DELETE /api/v1/admin
   Controller: AdminController.delete
 
 ============================================================
-12. SECURED DEMO
+17. SECURED DEMO
 ============================================================
 
 GET /api/v1/demo-controller
@@ -254,7 +419,7 @@ GET /api/v1/demo-controller
   Controller: DemoController.sayHello
 
 ============================================================
-13. SWAGGER / OPENAPI
+18. SWAGGER / OPENAPI
 ============================================================
 
 GET /v3/api-docs
@@ -268,6 +433,174 @@ GET /swagger-ui.html
 GET /swagger-ui/**
   Purpose: Swagger UI assets.
   Auth: Public by security whitelist.
+
+============================================================
+19. ADMIN PANEL BACKEND
+============================================================
+
+GET /api/v1/admin/dashboard
+  Purpose: Admin dashboard summary cards and recent activity feed.
+  Auth: ADMIN role.
+  Controller: AdminDashboardController.getDashboard
+
+GET /api/v1/admin/users/stats
+  Purpose: Total, active, and inactive user counts.
+  Auth: ADMIN role.
+  Controller: AdminUserController.getStats
+
+GET /api/v1/admin/users
+  Purpose: List users with role, enabled status, and pregnancy summary where available.
+  Query: search, enabled
+  Auth: ADMIN role.
+  Controller: AdminUserController.listUsers
+
+GET /api/v1/admin/pregnancies/stats
+  Purpose: Pregnancy profile metrics.
+  Auth: ADMIN role.
+  Controller: AdminPregnancyController.getStats
+
+GET /api/v1/admin/pregnancies
+  Purpose: List pregnancy profiles with trimester/week calculated from LMP.
+  Auth: ADMIN role.
+  Controller: AdminPregnancyController.listPregnancies
+
+GET /api/v1/admin/appointments/stats
+  Purpose: Total/upcoming/completed/missed appointment counts.
+  Auth: ADMIN role.
+  Controller: AdminAppointmentController.getStats
+
+GET /api/v1/admin/appointments
+  Purpose: List appointments for admin table.
+  Query: status
+  Auth: ADMIN role.
+  Controller: AdminAppointmentController.listAppointments
+
+GET /api/v1/admin/reminders/stats
+  Purpose: Sent/pending/failed reminder totals across medication and appointments.
+  Auth: ADMIN role.
+  Controller: AdminReminderController.getStats
+
+GET /api/v1/admin/reminders
+  Purpose: List medication and appointment reminders in one admin feed.
+  Query: type=MEDICATION|APPOINTMENT
+  Auth: ADMIN role.
+  Controller: AdminReminderController.listReminders
+
+GET /api/v1/admin/audio-library/stats
+  Purpose: Total/published/draft/archived audio counts.
+  Auth: ADMIN role.
+  Controller: AdminAudioLibraryController.getStats
+
+GET /api/v1/admin/audio-library
+  Purpose: List uploaded audio assets.
+  Query: category, language, status
+  Auth: ADMIN role.
+  Controller: AdminAudioLibraryController.listAudio
+
+POST /api/v1/admin/audio-library
+  Purpose: Upload audio file into ENGLISH, YORUBA, PIDGIN, or HAUSA language folder.
+  Body: multipart/form-data with title, category, language, durationSeconds, file.
+  Auth: ADMIN role.
+  Controller: AdminAudioLibraryController.uploadAudio
+
+PATCH /api/v1/admin/audio-library/{audioId}/status
+  Purpose: Set audio status to DRAFT, PUBLISHED, or ARCHIVED.
+  Query: status
+  Auth: ADMIN role.
+  Controller: AdminAudioLibraryController.updateStatus
+
+GET /api/v1/admin/audio-library/{audioId}/file
+  Purpose: Admin preview/download of uploaded audio file.
+  Auth: ADMIN role.
+  Controller: AdminAudioLibraryController.getAdminAudioFile
+
+GET /api/v1/audio-library/me
+  Purpose: User-facing audio list filtered by the authenticated user's language preference.
+  Query: category
+  Auth: Required.
+  Controller: PublicAudioLibraryController.getMyAudio
+
+GET /api/v1/audio-library/{audioId}/file
+  Purpose: Stream only PUBLISHED user-facing audio.
+  Auth: Required.
+  Controller: PublicAudioLibraryController.getPublishedAudioFile
+
+GET /api/v1/admin/community/stats
+  Purpose: Community members/posts/reactions/hidden/published metrics.
+  Auth: ADMIN role.
+  Controller: AdminCommunityController.getStats
+
+GET /api/v1/admin/community/posts
+  Purpose: List community posts for moderation.
+  Query: status
+  Auth: ADMIN role.
+  Controller: AdminCommunityController.listPosts
+
+PATCH /api/v1/admin/community/posts/{postId}/status
+  Purpose: Hide or publish a community post.
+  Body: { "status": "PUBLISHED" | "HIDDEN" }
+  Auth: ADMIN role.
+  Controller: AdminCommunityController.updatePostStatus
+
+GET /api/v1/admin/reports
+  Purpose: Admin analytics summary, feature engagement counts, audio-by-language counts, and honest data gaps.
+  Auth: ADMIN role.
+  Controller: AdminReportsController.getReports
+
+GET /api/v1/admin/notifications/stats
+  Purpose: Sent/scheduled/draft/failed notification counts.
+  Auth: ADMIN role.
+  Controller: AdminNotificationController.getStats
+
+GET /api/v1/admin/notifications
+  Purpose: List admin-created notifications.
+  Query: status
+  Auth: ADMIN role.
+  Controller: AdminNotificationController.listNotifications
+
+POST /api/v1/admin/notifications
+  Purpose: Create draft or scheduled notification record.
+  Body: title, body, type, audience, scheduledAt
+  Auth: ADMIN role.
+  Controller: AdminNotificationController.createNotification
+
+PATCH /api/v1/admin/notifications/{notificationId}/sent
+  Purpose: Mark notification as sent after external sender succeeds.
+  Auth: ADMIN role.
+  Controller: AdminNotificationController.markSent
+
+GET /api/v1/admin/settings
+  Purpose: Return platform/security/notification/backup settings and supported languages.
+  Auth: ADMIN role.
+  Controller: AdminSettingsController.getSettings
+
+PATCH /api/v1/admin/settings
+  Purpose: Update allowed admin setting keys.
+  Body: { "settings": { "platform.name": "MamaCare" } }
+  Auth: ADMIN role.
+  Controller: AdminSettingsController.updateSettings
+
+GET /api/v1/admin/support/stats
+  Purpose: Support request totals by status.
+  Auth: ADMIN role.
+  Controller: AdminSupportController.getStats
+
+GET /api/v1/admin/support/tickets
+  Purpose: List support tickets for admin table.
+  Query: status
+  Auth: ADMIN role.
+  Controller: AdminSupportController.listTickets
+
+PATCH /api/v1/admin/support/tickets/{ticketId}/status
+  Purpose: Move support ticket between OPEN, REVIEWING, and RESOLVED.
+  Body: { "status": "REVIEWING" }
+  Auth: ADMIN role.
+  Controller: AdminSupportController.updateStatus
+
+GET /api/v1/baby-growth/today/localized
+  Purpose: Baby growth screen using the user's selected audio language where uploaded audio exists.
+  Auth: Required.
+  Controller: BabyGrowthController.getTodayLocalized
 
 ============================================================
 QUICK FEATURE MAP
@@ -285,6 +618,25 @@ Pregnancy:
 
 Baby Growth:
   /api/v1/baby-growth/today
+  /api/v1/baby-growth/today/localized
+
+Audio Library:
+  /api/v1/audio-library/**
+
+Learn / Health Tips:
+  /api/v1/learn/**
+
+Daily Goals:
+  /api/v1/daily-goals/**
+
+Preferences:
+  /api/v1/preferences
+
+Profile:
+  /api/v1/profile/**
+
+Support:
+  /api/v1/support/**
 
 Community / Chat:
   /api/v1/community/**
@@ -302,6 +654,19 @@ Admin/Management demos:
   /api/v1/admin
   /api/v1/management
   /api/v1/demo-controller
+
+Admin Panel:
+  /api/v1/admin/dashboard
+  /api/v1/admin/users/**
+  /api/v1/admin/pregnancies/**
+  /api/v1/admin/appointments/**
+  /api/v1/admin/reminders/**
+  /api/v1/admin/audio-library/**
+  /api/v1/admin/community/**
+  /api/v1/admin/reports
+  /api/v1/admin/notifications/**
+  /api/v1/admin/settings
+  /api/v1/admin/support/**
 
 ============================================================
 NOTES

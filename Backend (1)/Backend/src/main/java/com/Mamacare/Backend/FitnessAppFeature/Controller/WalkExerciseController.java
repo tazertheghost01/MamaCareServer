@@ -2,6 +2,8 @@ package com.Mamacare.Backend.FitnessAppFeature.Controller;
 
 import com.Mamacare.Backend.FitnessAppFeature.Dtos.StartWalkSessionRequest;
 import com.Mamacare.Backend.FitnessAppFeature.Dtos.SyncWalkSessionMetricsRequest;
+import com.Mamacare.Backend.FitnessAppFeature.Dtos.UpdateWalkGoalSettingRequest;
+import com.Mamacare.Backend.FitnessAppFeature.Dtos.WalkGoalSettingResponse;
 import com.Mamacare.Backend.FitnessAppFeature.Dtos.WalkHomeResponse;
 import com.Mamacare.Backend.FitnessAppFeature.Dtos.WalkSessionResponse;
 import com.Mamacare.Backend.FitnessAppFeature.Services.WalkExerciseService;
@@ -18,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/walk-exercise")
 @RequiredArgsConstructor
@@ -28,6 +32,11 @@ public class WalkExerciseController {
     @GetMapping("/home")
     public ResponseEntity<WalkHomeResponse> getHome(Authentication authentication) {
         return ResponseEntity.ok(walkExerciseService.getHome(authentication));
+    }
+
+    @GetMapping("/sessions")
+    public ResponseEntity<List<WalkSessionResponse>> getSessionHistory(Authentication authentication) {
+        return ResponseEntity.ok(walkExerciseService.getSessionHistory(authentication));
     }
 
     @PostMapping("/sessions")
@@ -55,5 +64,26 @@ public class WalkExerciseController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(walkExerciseService.completeSession(sessionId, request, authentication));
+    }
+
+    @PatchMapping("/sessions/{sessionId}/cancel")
+    public ResponseEntity<WalkSessionResponse> cancelSession(
+            @PathVariable Long sessionId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(walkExerciseService.cancelSession(sessionId, authentication));
+    }
+
+    @GetMapping("/goal-setting")
+    public ResponseEntity<WalkGoalSettingResponse> getGoalSetting(Authentication authentication) {
+        return ResponseEntity.ok(walkExerciseService.getGoalSetting(authentication));
+    }
+
+    @PatchMapping("/goal-setting")
+    public ResponseEntity<WalkGoalSettingResponse> updateGoalSetting(
+            @Valid @RequestBody UpdateWalkGoalSettingRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(walkExerciseService.updateGoalSetting(request, authentication));
     }
 }

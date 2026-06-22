@@ -4,6 +4,7 @@ import com.Mamacare.Backend.BabyGrowthPackage.Dto.BabyGrowthResponse;
 import com.Mamacare.Backend.BabyGrowthPackage.Services.BabyGrowthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,5 +21,10 @@ public class BabyGrowthController {
   @GetMapping("/today")
   public ResponseEntity<BabyGrowthResponse> getToday(Principal principal) {
     return ResponseEntity.ok(babyGrowthService.getToday(principal.getName()));
+  }
+
+  @GetMapping("/today/localized")
+  public ResponseEntity<BabyGrowthResponse> getTodayLocalized(Authentication authentication) {
+    return ResponseEntity.ok(babyGrowthService.getToday(authentication));
   }
 }

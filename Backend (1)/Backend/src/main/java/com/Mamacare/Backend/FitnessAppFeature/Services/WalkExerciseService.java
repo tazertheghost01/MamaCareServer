@@ -3,6 +3,8 @@ package com.Mamacare.Backend.FitnessAppFeature.Services;
 import com.Mamacare.Backend.AuthenticationPackage.user.User;
 import com.Mamacare.Backend.FitnessAppFeature.Dtos.StartWalkSessionRequest;
 import com.Mamacare.Backend.FitnessAppFeature.Dtos.SyncWalkSessionMetricsRequest;
+import com.Mamacare.Backend.FitnessAppFeature.Dtos.UpdateWalkGoalSettingRequest;
+import com.Mamacare.Backend.FitnessAppFeature.Dtos.WalkGoalSettingResponse;
 import com.Mamacare.Backend.FitnessAppFeature.Dtos.WalkHomeResponse;
 import com.Mamacare.Backend.FitnessAppFeature.Dtos.WalkSessionResponse;
 import com.Mamacare.Backend.FitnessAppFeature.Entity.WalkGoalSetting;
@@ -111,6 +113,54 @@ public class WalkExerciseService {
         return toResponse(walkSessionRepository.save(session));
     }
 
+    @Transactional(readOnly = true)
+    public List<WalkSessionResponse> getSessionHistory(Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+        return walkSessionRepository.findTop20ByUserIdOrderByStartedAtDesc(currentUser.getId())
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public WalkGoalSettingResponse getGoalSetting(Authentication authentication) {
+        return toGoalSettingResponse(getGoalSettingOrDefault(getCurrentUser(authentication)));
+    }
+
+    @Transactional
+    public WalkGoalSettingResponse updateGoalSetting(
+            UpdateWalkGoalSettingRequest request,
+            Authentication authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        WalkGoalSetting goalSetting = walkGoalSettingRepository.findByUserId(currentUser.getId())
+                .orElseGet(() -> WalkGoalSetting.builder()
+                        .user(currentUser)
+                        .dailyGoalMinutes(DEFAULT_GOAL_MINUTES)
+                        .timezone(DEFAULT_TIMEZONE)
+                        .build());
+
+        if (request.getDailyGoalMinutes() != null) {
+            goalSetting.setDailyGoalMinutes(request.getDailyGoalMinutes());
+        }
+        if (request.getTimezone() != null) {
+            goalSetting.setTimezone(normalizeTimezone(request.getTimezone()));
+        }
+
+        return toGoalSettingResponse(walkGoalSettingRepository.save(goalSetting));
+    }
+
+    @Transactional
+    public WalkSessionResponse cancelSession(Long sessionId, Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+        WalkSession session = findSessionOwnedByUser(sessionId, currentUser.getId());
+
+        session.setStatus(WalkSessionStatus.CANCELLED);
+        session.setEndedAt(OffsetDateTime.now(ZoneId.of(session.getTimezone())));
+
+        return toResponse(walkSessionRepository.save(session));
+    }
+
     private WalkSessionResponse createSession(User currentUser, StartWalkSessionRequest request) {
         WalkGoalSetting goalSetting = getGoalSettingOrDefault(currentUser);
         String timezone = normalizeTimezone(request == null ? null : request.getTimezone());
@@ -187,6 +237,13 @@ public class WalkExerciseService {
                 .displayDistance(displayDistance(session.getDistanceMeters()))
                 .caloriesKcal(session.getCaloriesKcal())
                 .sourcePlatform(session.getSourcePlatform())
+                .build();
+    }
+
+    private WalkGoalSettingResponse toGoalSettingResponse(WalkGoalSetting goalSetting) {
+        return WalkGoalSettingResponse.builder()
+                .dailyGoalMinutes(goalSetting.getDailyGoalMinutes())
+                .timezone(goalSetting.getTimezone())
                 .build();
     }
 

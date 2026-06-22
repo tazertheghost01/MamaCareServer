@@ -2,9 +2,12 @@ package com.Mamacare.Backend.MedicationRemiderPackage.Controller;
 
 import com.Mamacare.Backend.MedicationRemiderPackage.DTOs.CreateMedicationRequest;
 import com.Mamacare.Backend.MedicationRemiderPackage.DTOs.MarkMedicationTakenResponse;
+import com.Mamacare.Backend.MedicationRemiderPackage.DTOs.MedicationIntakeHistoryResponse;
 import com.Mamacare.Backend.MedicationRemiderPackage.DTOs.MedicationHomeResponse;
 import com.Mamacare.Backend.MedicationRemiderPackage.DTOs.MedicationResponse;
+import com.Mamacare.Backend.MedicationRemiderPackage.DTOs.UpdateMedicationRequest;
 import com.Mamacare.Backend.MedicationRemiderPackage.Service.MedicationService;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -46,6 +49,20 @@ public class MedicationController {
         return ResponseEntity.ok(medicationService.getAllMedications(authentication));
     }
 
+    @GetMapping("/history")
+    public ResponseEntity<List<MedicationIntakeHistoryResponse>> getIntakeHistory(Authentication authentication) {
+        return ResponseEntity.ok(medicationService.getIntakeHistory(authentication));
+    }
+
+    @PatchMapping("/{medicationId}")
+    public ResponseEntity<MedicationResponse> updateMedication(
+            @PathVariable Long medicationId,
+            @Valid @RequestBody UpdateMedicationRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(medicationService.updateMedication(medicationId, request, authentication));
+    }
+
     @PatchMapping("/{medicationId}/taken")
     public ResponseEntity<MarkMedicationTakenResponse> markTaken(
             @PathVariable Long medicationId,
@@ -62,4 +79,22 @@ public class MedicationController {
         medicationService.deactivateMedication(medicationId, authentication);
         return ResponseEntity.noContent().build();
     }
+
+    @PatchMapping("/{medicationId}/reminder")
+    public ResponseEntity<MedicationResponse> updateReminderEnabled(
+            @PathVariable Long medicationId,
+            @RequestBody UpdateReminderEnabledRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(medicationService.updateReminderEnabled(
+                medicationId,
+                request.reminderEnabled(),
+                authentication
+        ));
+    }
+
+    public record UpdateReminderEnabledRequest(
+            @JsonProperty("reminder_enabled")
+            boolean reminderEnabled
+    ) {}
 }

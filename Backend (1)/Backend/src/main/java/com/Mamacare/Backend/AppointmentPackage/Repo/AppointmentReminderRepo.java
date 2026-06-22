@@ -7,4 +7,6 @@ import java.util.List;
 public interface AppointmentReminderRepo extends JpaRepository<AppointmentReminder, Long> {
 
     List<AppointmentReminder> findByAppointmentIdOrderByRemindAtAsc(Long appointmentId);
+
+    long countByStatus(com.Mamacare.Backend.AppointmentPackage.Enums.AppointmentReminderStatus status);
 }

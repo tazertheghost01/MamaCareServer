@@ -12,4 +12,6 @@ public interface MedicationIntakeLogRepo extends JpaRepository<MedicationIntakeL
     Optional<MedicationIntakeLog> findByMedicationIdAndIntakeDate(Long medicationId, LocalDate intakeDate);
 
     List<MedicationIntakeLog> findByMedicationIdInAndIntakeDate(List<Long> medicationIds, LocalDate intakeDate);
+
+    List<MedicationIntakeLog> findByMedication_User_IdOrderByIntakeDateDesc(Integer userId);
 }

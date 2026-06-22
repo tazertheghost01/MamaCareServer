@@ -14,4 +14,6 @@ public interface MedicationReminderRepo extends JpaRepository<MedicationReminder
             MedicationReminderStatus status,
             OffsetDateTime now
     );
+
+    long countByStatus(MedicationReminderStatus status);
 }

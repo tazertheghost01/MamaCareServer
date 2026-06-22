@@ -5,6 +5,7 @@ import com.Mamacare.Backend.AppointmentPackage.Dtos.AppointmentChecklistItemResp
 import com.Mamacare.Backend.AppointmentPackage.Dtos.AppointmentReminderResponse;
 import com.Mamacare.Backend.AppointmentPackage.Dtos.CreateAppointmentRequest;
 import com.Mamacare.Backend.AppointmentPackage.Dtos.NextAppointmentResponse;
+import com.Mamacare.Backend.AppointmentPackage.Dtos.UpdateAppointmentRequest;
 import com.Mamacare.Backend.AppointmentPackage.Dtos.UpdateChecklistItemRequest;
 import com.Mamacare.Backend.AppointmentPackage.Entity.Appointment;
 import com.Mamacare.Backend.AppointmentPackage.Entity.AppointmentChecklistItem;
@@ -39,6 +40,40 @@ public class AppointmentService {
     private final AppointmentRepo appointmentRepository;
     private final AppointmentReminderRepo reminderRepository;
     private final AppointmentChecklistItemRepo checklistItemRepository;
+
+    @Transactional(readOnly = true)
+    public List<AppointmentResponse> getAllAppointments(Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+        return appointmentRepository.findByUserIdOrderByScheduledStartAtDesc(currentUser.getId())
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AppointmentResponse> getUpcomingAppointments(Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+        OffsetDateTime now = OffsetDateTime.now(ZoneId.of(DEFAULT_TIMEZONE));
+        return appointmentRepository
+                .findByUserIdAndStatusAndScheduledStartAtGreaterThanEqualOrderByScheduledStartAtAsc(
+                        currentUser.getId(),
+                        AppointmentStatus.SCHEDULED,
+                        now
+                )
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AppointmentResponse> getCompletedAppointments(Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+        return appointmentRepository
+                .findByUserIdAndStatusOrderByScheduledStartAtDesc(currentUser.getId(), AppointmentStatus.COMPLETED)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
 
     @Transactional
     public AppointmentResponse createAppointment(CreateAppointmentRequest request, Authentication authentication) {
@@ -101,6 +136,79 @@ public class AppointmentService {
         return toChecklistItemResponse(savedItem);
     }
 
+    @Transactional
+    public AppointmentResponse updateAppointment(
+            Long appointmentId,
+            UpdateAppointmentRequest request,
+            Authentication authentication
+    ) {
+        User currentUser = getCurrentUser(authentication);
+        Appointment appointment = appointmentRepository
+                .findByIdAndUserId(appointmentId, currentUser.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Appointment not found."));
+
+        LocalDate appointmentDate = request.getAppointmentDate() == null
+                ? appointment.getScheduledStartAt().toLocalDate()
+                : request.getAppointmentDate();
+        LocalTime appointmentTime = request.getAppointmentTime() == null
+                ? appointment.getScheduledStartAt().toLocalTime()
+                : request.getAppointmentTime();
+        String timezone = request.getTimezone() == null
+                ? appointment.getTimezone()
+                : normalizeTimezone(request.getTimezone());
+
+        OffsetDateTime scheduledStartAt = toOffsetDateTime(appointmentDate, appointmentTime, timezone);
+        if (scheduledStartAt.isBefore(OffsetDateTime.now(ZoneId.of(timezone)))) {
+            throw new IllegalArgumentException("Appointment date and time must be in the future.");
+        }
+
+        if (request.getAppointmentType() != null) {
+            appointment.setAppointmentType(request.getAppointmentType());
+        }
+        if (request.getLocationName() != null && !request.getLocationName().isBlank()) {
+            appointment.setLocationName(request.getLocationName().trim());
+        }
+        if (request.getNotes() != null) {
+            appointment.setNotes(normalizeText(request.getNotes()));
+        }
+        if (request.getReminderEnabled() != null) {
+            appointment.setReminderEnabled(request.getReminderEnabled());
+        }
+
+        appointment.setTimezone(timezone);
+        appointment.setScheduledStartAt(scheduledStartAt);
+        appointment.setStatus(AppointmentStatus.SCHEDULED);
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        refreshReminders(savedAppointment, request.getReminderOffsets());
+
+        return toResponse(savedAppointment);
+    }
+
+    @Transactional
+    public AppointmentResponse cancelAppointment(Long appointmentId, Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+        Appointment appointment = appointmentRepository
+                .findByIdAndUserId(appointmentId, currentUser.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Appointment not found."));
+
+        appointment.setStatus(AppointmentStatus.CANCELLED);
+        cancelPendingReminders(appointment);
+        return toResponse(appointmentRepository.save(appointment));
+    }
+
+    @Transactional
+    public AppointmentResponse completeAppointment(Long appointmentId, Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+        Appointment appointment = appointmentRepository
+                .findByIdAndUserId(appointmentId, currentUser.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Appointment not found."));
+
+        appointment.setStatus(AppointmentStatus.COMPLETED);
+        cancelPendingReminders(appointment);
+        return toResponse(appointmentRepository.save(appointment));
+    }
+
     private User getCurrentUser(Authentication authentication) {
         return (User) authentication.getPrincipal();
     }
@@ -161,6 +269,23 @@ public class AppointmentService {
 
             reminderRepository.save(reminder);
         }
+    }
+
+    private void refreshReminders(Appointment appointment, List<AppointmentReminderOffset> reminderOffsets) {
+        cancelPendingReminders(appointment);
+        if (appointment.isReminderEnabled()) {
+            createReminderRows(appointment, reminderOffsets);
+        }
+    }
+
+    private void cancelPendingReminders(Appointment appointment) {
+        List<AppointmentReminder> reminders = reminderRepository.findByAppointmentIdOrderByRemindAtAsc(appointment.getId());
+        for (AppointmentReminder reminder : reminders) {
+            if (reminder.getStatus() == AppointmentReminderStatus.PENDING) {
+                reminder.setStatus(AppointmentReminderStatus.CANCELLED);
+            }
+        }
+        reminderRepository.saveAll(reminders);
     }
 
     private OffsetDateTime calculateRemindAt(OffsetDateTime scheduledStartAt, AppointmentReminderOffset offset) {

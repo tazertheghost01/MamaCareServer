@@ -12,6 +12,8 @@ public interface WalkSessionRepo extends JpaRepository<WalkSession, Long> {
 
     List<WalkSession> findByUserIdAndSessionDateOrderByStartedAtAsc(Integer userId, LocalDate sessionDate);
 
+    List<WalkSession> findTop20ByUserIdOrderByStartedAtDesc(Integer userId);
+
     Optional<WalkSession> findFirstByUserIdAndStatusOrderByStartedAtDesc(Integer userId, WalkSessionStatus status);
 
     Optional<WalkSession> findByUserIdAndSourceSessionId(Integer userId, String sourceSessionId);
