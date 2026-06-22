@@ -1,188 +1,214 @@
 import React, { useState, useEffect } from "react";
-import {
-  View, Text, Image, TouchableOpacity, ScrollView,
-  ActivityIndicator, Dimensions,
-} from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import { Audio } from "expo-av";
+import { useTranslation } from "react-i18next";
 
-const { width } = Dimensions.get("window");
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 async function authHeaders() {
   const token = await SecureStore.getItemAsync("accessToken");
-  return { "Content-Type": "application/json", "Authorization": `Bearer ${token}` };
-}
-
-// Weekly data map — no endpoint yet so hardcoded per week
-const WEEKLY_DATA: Record<number, { length: string; weight: string; heartbeat: string; highlights: string[] }> = {
-  24: {
-    length: "30.0 cm", weight: "600 g", heartbeat: "Strong",
-    highlights: ["Baby's lungs are developing.", "Baby can hear your voice.", "Baby's movement maybe stronger."],
-  },
-  20: {
-    length: "25.6 cm", weight: "300 g", heartbeat: "Strong",
-    highlights: ["Baby can swallow.", "Baby starts to develop taste buds.", "Movements are more coordinated."],
-  },
-  28: {
-    length: "37.6 cm", weight: "1000 g", heartbeat: "Strong",
-    highlights: ["Baby can open their eyes.", "Baby is gaining fat.", "Brain is developing rapidly."],
-  },
-};
-
-function getWeekData(weeks: number) {
-  return WEEKLY_DATA[weeks] || {
-    length: "--", weight: "--", heartbeat: "Normal",
-    highlights: ["Your baby is growing well.", "Keep taking your prenatal vitamins.", "Stay hydrated and rest well."],
+  return {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`,
   };
 }
 
 export default function BabyGrowthScreen() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
-  const [weeks, setWeeks] = useState(0);
-  const [trimester, setTrimester] = useState("");
+  const [growthData, setGrowthData] = useState<any>(null);
+  
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-  useEffect(() => { loadPregnancy(); }, []);
+  useEffect(() => {
+    loadData();
+    return () => {
+      if (sound) sound.unloadAsync();
+    };
+  }, []);
 
-  const loadPregnancy = async () => {
+  const loadData = async () => {
     try {
       const headers = await authHeaders();
-      const res = await fetch(`${BASE_URL}/api/v1/pregnancy/me`, { headers });
+      const res = await fetch(`${BASE_URL}/api/v1/baby-growth/today/localized`, { headers });
       if (res.ok) {
-        const data = await res.json();
-        setWeeks(data.weeksOfPregnancy || 0);
-        const w = data.weeksOfPregnancy || 0;
-        setTrimester(w <= 12 ? "1st Trimester" : w <= 26 ? "2nd Trimester" : "3rd Trimester");
+        setGrowthData(await res.json());
       }
     } catch (e) {
-      const stored = await SecureStore.getItemAsync("pregnancyWeeks");
-      if (stored) setWeeks(parseInt(stored));
+      console.log("Failed to load baby growth", e);
+    } finally {
+      setLoading(false);
     }
-    finally { setLoading(false); }
   };
 
-  const weekData = getWeekData(weeks);
+  const handleAudioPress = async () => {
+    if (!growthData?.audio_update?.audio_url) return;
+    
+    if (isPlaying) {
+      if (sound) await sound.pauseAsync();
+      setIsPlaying(false);
+      return;
+    }
+
+    if (sound) {
+      await sound.playAsync();
+      setIsPlaying(true);
+    } else {
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: growthData.audio_update.audio_url.startsWith("http") ? growthData.audio_update.audio_url : `${BASE_URL}${growthData.audio_update.audio_url}` },
+        { shouldPlay: true }
+      );
+      setSound(newSound);
+      setIsPlaying(true);
+
+      newSound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && !status.isPlaying && status.didJustFinish) {
+          setIsPlaying(false);
+        }
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F8F8", justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#2D7A4F" />
+      </SafeAreaView>
+    );
+  }
+
+  if (!growthData) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F8F8", justifyContent: "center", alignItems: "center" }}>
+        <Text style={{ color: "#888", marginTop: 20 }}>Unable to load baby growth data.</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20, padding: 10 }}>
+          <Text style={{ color: "#2D7A4F", fontWeight: "700" }}>Go Back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
-      {/* Header */}
-      <View style={{
-        flexDirection: "row", alignItems: "center", gap: 10,
-        paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14,
-        borderBottomWidth: 1, borderBottomColor: "#F5F5F5",
-      }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ width: 36, height: 36, justifyContent: "center" }}>
-          <Ionicons name="arrow-back" size={24} color="#111" />
-        </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontWeight: "800", color: "#111" }}>Baby Growth</Text>
-      </View>
-
-      {loading ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color="#2D7A4F" size="large" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Header */}
+        <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingTop: 16, paddingBottom: 10 }}>
+          <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, justifyContent: "center" }}>
+            <Ionicons name="arrow-back" size={24} color="#111" />
+          </TouchableOpacity>
+          <Text style={{ fontSize: 18, fontWeight: "800", color: "#111", marginLeft: 10 }}>
+            {growthData.screen_title || "Baby's Growth"}
+          </Text>
         </View>
-      ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
 
-          {/* Hero */}
-          <View style={{
-            marginHorizontal: 20, marginTop: 16, marginBottom: 16,
-            backgroundColor: "#F0FAF4", borderRadius: 20, padding: 20,
-            flexDirection: "row", alignItems: "center",
+        {/* Hero Section */}
+        <View style={{ paddingHorizontal: 20, marginTop: 10, alignItems: "center" }}>
+          <View style={{ 
+            width: 140, height: 140, borderRadius: 70, backgroundColor: "#F0FAF4", 
+            justifyContent: "center", alignItems: "center", marginBottom: 20 
           }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 20, fontWeight: "800", color: "#2D7A4F", lineHeight: 28, marginBottom: 12 }}>
-                Your baby{"\n"}is growing{"\n"}beautifully!
-              </Text>
-              <TouchableOpacity style={{
-                flexDirection: "row", alignItems: "center", gap: 8,
-                backgroundColor: "#fff", borderRadius: 25, paddingHorizontal: 14,
-                paddingVertical: 8, alignSelf: "flex-start",
-                shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
-              }}>
-                <Ionicons name="volume-medium-outline" size={15} color="#2D7A4F" />
-                <Text style={{ fontSize: 12, color: "#2D7A4F", fontWeight: "600" }}>Listen in yoruba</Text>
-                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "#2D7A4F", alignItems: "center", justifyContent: "center" }}>
-                  <Ionicons name="play" size={9} color="#fff" />
+            <Image 
+              source={require("../assets/images/8.png")} 
+              style={{ width: 100, height: 100 }} 
+              resizeMode="contain" 
+            />
+          </View>
+          <Text style={{ fontSize: 24, fontWeight: "800", color: "#111", textAlign: "center", marginBottom: 8 }}>
+            {growthData.pregnancy_status?.message || "Your Pregnancy"}
+          </Text>
+          <Text style={{ fontSize: 15, color: "#555", textAlign: "center", lineHeight: 22, paddingHorizontal: 20 }}>
+            {growthData.hero_message}
+          </Text>
+        </View>
+
+        {/* Audio Pill */}
+        {growthData.audio_update?.audio_url && (
+          <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
+            <TouchableOpacity 
+              onPress={handleAudioPress}
+              style={{
+                backgroundColor: "#2D7A4F", borderRadius: 16, padding: 16,
+                flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                shadowColor: "#2D7A4F", shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.2, shadowRadius: 8, elevation: 4,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" }}>
+                  <Ionicons name={isPlaying ? "pause" : "play"} size={20} color="#fff" />
                 </View>
-              </TouchableOpacity>
-            </View>
-            {/* Baby embryo image */}
-            <Image source={require("../../assets/images/8.png")} style={{ width: 100, height: 110 }} resizeMode="contain" />
-          </View>
-
-          {/* Pregnancy summary */}
-          <View style={{
-            marginHorizontal: 20, marginBottom: 16,
-            backgroundColor: "#fff", borderRadius: 16, padding: 16,
-            borderWidth: 1, borderColor: "#F0F0F0",
-            shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
-          }}>
-            <Text style={{ fontSize: 15, fontWeight: "800", color: "#111", marginBottom: 4 }}>
-              You are {weeks} weeks pregnant
-            </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <Text style={{ fontSize: 13, color: "#888" }}>{trimester}</Text>
-              <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: "#CCC" }} />
-              <Text style={{ fontSize: 13, color: "#888" }}>Week {weeks}</Text>
-            </View>
-            <Text style={{ fontSize: 13, color: "#555" }}>Your baby is healthy and big enough!</Text>
-          </View>
-
-          {/* Growth this week */}
-          <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
-            <Text style={{ fontSize: 15, fontWeight: "800", color: "#111", marginBottom: 12 }}>
-              Growth this week
-            </Text>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              {[
-                { icon: "resize-outline", label: "Length", value: weekData.length },
-                { icon: "barbell-outline", label: "Weight", value: weekData.weight },
-                { icon: "heart-outline", label: "Heartbeat", value: weekData.heartbeat },
-              ].map((stat) => (
-                <View key={stat.label} style={{
-                  flex: 1, backgroundColor: "#fff", borderRadius: 14, padding: 12, alignItems: "center",
-                  borderWidth: 1, borderColor: "#F0F0F0",
-                  shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
-                }}>
-                  <Ionicons name={stat.icon as any} size={18} color="#2D7A4F" style={{ marginBottom: 6 }} />
-                  <Text style={{ fontSize: 13, fontWeight: "800", color: "#111", marginBottom: 2 }}>{stat.value}</Text>
-                  <Text style={{ fontSize: 10, color: "#888" }}>{stat.label}</Text>
+                <View>
+                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
+                    {growthData.audio_update.label || "Listen to weekly update"}
+                  </Text>
+                  <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, marginTop: 2 }}>
+                    {Math.floor(growthData.audio_update.duration_seconds / 60)}:{(growthData.audio_update.duration_seconds % 60).toString().padStart(2, '0')} min audio
+                  </Text>
                 </View>
-              ))}
-            </View>
+              </View>
+              <Ionicons name="volume-high-outline" size={24} color="#fff" />
+            </TouchableOpacity>
           </View>
+        )}
 
-          {/* What is Happening This Week */}
-          <View style={{ paddingHorizontal: 20 }}>
-            <Text style={{ fontSize: 15, fontWeight: "800", color: "#111", marginBottom: 12 }}>
-              What is Happening This Week
-            </Text>
-            <View style={{
-              backgroundColor: "#fff", borderRadius: 16, padding: 16,
-              borderWidth: 1, borderColor: "#F0F0F0",
-              shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
-              gap: 12,
-            }}>
-              {weekData.highlights.map((h, i) => (
-                <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
-                  <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "#2D7A4F", alignItems: "center", justifyContent: "center", marginTop: 1 }}>
-                    <Ionicons name="checkmark" size={13} color="#fff" />
+        {/* Growth Stats */}
+        {growthData.growth_this_week && (
+          <View style={{ paddingHorizontal: 20, marginTop: 30 }}>
+            <Text style={{ fontSize: 18, fontWeight: "800", color: "#111", marginBottom: 16 }}>Growth this week</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+              <View style={{ flex: 1, minWidth: "45%", backgroundColor: "#F9F9F9", borderRadius: 16, padding: 16, alignItems: "center" }}>
+                <Ionicons name="resize-outline" size={24} color="#2D7A4F" style={{ marginBottom: 8 }} />
+                <Text style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>Length</Text>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#111", textAlign: "center" }}>{growthData.growth_this_week.length_label}</Text>
+              </View>
+              <View style={{ flex: 1, minWidth: "45%", backgroundColor: "#F9F9F9", borderRadius: 16, padding: 16, alignItems: "center" }}>
+                <Ionicons name="barbell-outline" size={24} color="#D68000" style={{ marginBottom: 8 }} />
+                <Text style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>Weight</Text>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#111", textAlign: "center" }}>{growthData.growth_this_week.weight_label}</Text>
+              </View>
+              {growthData.growth_this_week.heartbeat_label && (
+                <View style={{ width: "100%", backgroundColor: "#FFF5F5", borderRadius: 16, padding: 16, flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <Ionicons name="heart" size={24} color="#E53935" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 12, color: "#888", marginBottom: 2 }}>Heartbeat</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#111" }}>{growthData.growth_this_week.heartbeat_label}</Text>
                   </View>
-                  <Text style={{ fontSize: 14, color: "#444", flex: 1, lineHeight: 20 }}>{h}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Happenings */}
+        {growthData.happenings && growthData.happenings.length > 0 && (
+          <View style={{ paddingHorizontal: 20, marginTop: 30 }}>
+            <Text style={{ fontSize: 18, fontWeight: "800", color: "#111", marginBottom: 16 }}>What's happening</Text>
+            <View style={{ gap: 12 }}>
+              {growthData.happenings.map((happening: any, index: number) => (
+                <View key={index} style={{ flexDirection: "row", gap: 12, backgroundColor: "#F9F9F9", padding: 16, borderRadius: 16 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#2D7A4F", marginTop: 6 }} />
+                  <Text style={{ flex: 1, fontSize: 14, color: "#333", lineHeight: 22 }}>{happening.text}</Text>
                 </View>
               ))}
             </View>
           </View>
+        )}
+        
+        {/* Disclaimer */}
+        {growthData.disclaimer && (
+          <View style={{ paddingHorizontal: 20, marginTop: 30 }}>
+            <Text style={{ fontSize: 12, color: "#AAA", textAlign: "center", fontStyle: "italic", lineHeight: 18 }}>
+              {growthData.disclaimer}
+            </Text>
+          </View>
+        )}
 
-        </ScrollView>
-      )}
+      </ScrollView>
     </SafeAreaView>
   );
 }

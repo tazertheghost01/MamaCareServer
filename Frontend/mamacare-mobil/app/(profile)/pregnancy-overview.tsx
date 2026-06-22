@@ -68,7 +68,7 @@ export default function PregnancyOverviewScreen() {
     return "3rd Trimester";
   };
 
-  const weeks = pregnancy?.weeksOfPregnancy || 0;
+  const weeks = pregnancy?.week || 0;
   const daysToGo = pregnancy?.daysOfPregnancy
     ? 280 - pregnancy.daysOfPregnancy
     : null;

@@ -28,21 +28,43 @@ const DEFAULT_GOALS = [
 ];
 
 export default function MyGoalsScreen() {
-  const [goals, setGoals] = useState(DEFAULT_GOALS);
+  const [goalsData, setGoalsData] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [newGoal, setNewGoal] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const completedCount = goals.filter((g) => g.completed).length;
+  useEffect(() => {
+    loadGoals();
+  }, []);
 
-  const toggleGoal = async (id: string) => {
-    setGoals((prev) =>
-      prev.map((g) => g.id === id ? { ...g, completed: !g.completed } : g)
-    );
-    // POST to goals endpoint (to be implemented by backend)
+  const loadGoals = async () => {
     try {
       const headers = await authHeaders();
-      await fetch(`${BASE_URL}/api/v1/goals/${id}/toggle`, {
+      const res = await fetch(`${BASE_URL}/api/v1/daily-goals/today`, { headers });
+      if (res.ok) {
+        setGoalsData(await res.json());
+      }
+    } catch (e) {
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const goals = goalsData?.goals || [];
+  const completedCount = goalsData?.completed_count || 0;
+
+  const toggleGoal = async (id: string) => {
+    // Optimistic UI update
+    setGoalsData((prev: any) => ({
+      ...prev,
+      goals: prev.goals.map((g: any) => g.id === id ? { ...g, completed: !g.completed } : g),
+      completed_count: prev.goals.find((g: any) => g.id === id)?.completed ? prev.completed_count - 1 : prev.completed_count + 1
+    }));
+    
+    try {
+      const headers = await authHeaders();
+      await fetch(`${BASE_URL}/api/v1/daily-goals/${id}/complete`, {
         method: "PATCH",
         headers,
       });
@@ -52,21 +74,15 @@ export default function MyGoalsScreen() {
   const addGoal = async () => {
     if (!newGoal.trim()) return;
     setSaving(true);
-    const goal = {
-      id: Date.now().toString(),
-      icon: "flag-outline",
-      title: newGoal.trim(),
-      completed: false,
-    };
     try {
       const headers = await authHeaders();
-      await fetch(`${BASE_URL}/api/v1/goals`, {
+      await fetch(`${BASE_URL}/api/v1/daily-goals`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ title: newGoal.trim() }),
+        body: JSON.stringify({ title: newGoal.trim(), category: "WELLNESS" }),
       });
+      await loadGoals(); // Reload fresh data
     } catch (e) {}
-    setGoals((prev) => [...prev, goal]);
     setNewGoal("");
     setSaving(false);
     setShowModal(false);
