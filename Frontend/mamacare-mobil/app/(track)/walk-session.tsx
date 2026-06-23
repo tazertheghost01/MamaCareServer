@@ -6,6 +6,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import { Pedometer } from "expo-sensors";
+import { Platform } from "react-native";
 
 const { width } = Dimensions.get("window");
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
@@ -25,31 +27,44 @@ export default function WalkSessionScreen() {
   const [goalMin] = useState(15);
   const timerRef = useRef<any>(null);
   const syncRef = useRef<any>(null);
+  const stepSubscriptionRef = useRef<any>(null);
+  const [sourceStatus, setSourceStatus] = useState<"loading" | "phone" | "manual">("loading");
 
   const startSession = async () => {
     try {
       const headers = await authHeaders();
       const res = await fetch(`${BASE_URL}/api/v1/walk-exercise/sessions`, {
         method: "POST", headers,
-        body: JSON.stringify({ goalSteps: 2000, goalDuration: goalMin }),
+        body: JSON.stringify({
+          goal_minutes: goalMin,
+          timezone: "Africa/Lagos",
+          source_platform: Platform.OS === "ios" ? "IOS" : "ANDROID",
+        }),
       });
       if (res.ok || res.status === 201) {
         const data = await res.json();
         setSessionId(data.id);
         setRunning(true);
+        setSourceStatus("manual");
         timerRef.current = setInterval(() => {
           setElapsed((e) => e + 1);
-          setSteps((s) => s + Math.floor(Math.random() * 3));
         }, 1000);
+        const available = await Pedometer.isAvailableAsync().catch(() => false);
+        if (available) {
+          setSourceStatus("phone");
+          stepSubscriptionRef.current = Pedometer.watchStepCount((result) => {
+            setSteps(Math.max(0, Math.floor(result.steps)));
+          });
+        }
         // Sync metrics every 10 seconds
         syncRef.current = setInterval(() => syncMetrics(data.id), 10000);
       }
     } catch (e) {
       // Run locally without backend
       setRunning(true);
+      setSourceStatus("manual");
       timerRef.current = setInterval(() => {
         setElapsed((e) => e + 1);
-        setSteps((s) => s + Math.floor(Math.random() * 3));
       }, 1000);
     }
   };
@@ -63,7 +78,7 @@ export default function WalkSessionScreen() {
       setCalories(cal);
       await fetch(`${BASE_URL}/api/v1/walk-exercise/sessions/${id}/metrics`, {
         method: "PATCH", headers,
-        body: JSON.stringify({ steps, distance: dist, calories: cal, duration: Math.floor(elapsed / 60) }),
+        body: JSON.stringify({ steps, distance: dist, calories: cal, duration_seconds: elapsed }),
       });
     } catch (e) {}
   };
@@ -71,6 +86,10 @@ export default function WalkSessionScreen() {
   const stopSession = async () => {
     clearInterval(timerRef.current);
     clearInterval(syncRef.current);
+    if (stepSubscriptionRef.current?.remove) {
+      stepSubscriptionRef.current.remove();
+      stepSubscriptionRef.current = null;
+    }
     setRunning(false);
     if (sessionId) {
       try {
@@ -79,7 +98,7 @@ export default function WalkSessionScreen() {
         const cal = Math.floor(steps * 0.04);
         await fetch(`${BASE_URL}/api/v1/walk-exercise/sessions/${sessionId}/complete`, {
           method: "PATCH", headers,
-          body: JSON.stringify({ steps, distance: dist, calories: cal, duration: Math.floor(elapsed / 60) }),
+          body: JSON.stringify({ steps, distance: dist, calories: cal, duration_seconds: elapsed }),
         });
       } catch (e) {}
     }
@@ -93,6 +112,9 @@ export default function WalkSessionScreen() {
     return () => {
       clearInterval(timerRef.current);
       clearInterval(syncRef.current);
+      if (stepSubscriptionRef.current?.remove) {
+        stepSubscriptionRef.current.remove();
+      }
     };
   }, []);
 
@@ -127,6 +149,17 @@ export default function WalkSessionScreen() {
         </TouchableOpacity>
         <Text style={{ fontSize: 18, fontWeight: "800", color: "#111" }}>Walk Session</Text>
       </View>
+
+      {sourceStatus === "manual" && (
+        <View style={{ backgroundColor: "#FFF8E1", borderRadius: 14, padding: 14, marginHorizontal: 20, marginTop: 18, marginBottom: 4, borderWidth: 1, borderColor: "#F3D98A" }}>
+          <Text style={{ fontSize: 13, fontWeight: "700", color: "#8A5D00", marginBottom: 4 }}>
+            We cannot reach your phone activity data.
+          </Text>
+          <Text style={{ fontSize: 12, color: "#8A5D00", lineHeight: 18 }}>
+            Manual timer mode is active. Your steps will only change when your phone reports real movement.
+          </Text>
+        </View>
+      )}
 
       <View style={{ flex: 1, paddingHorizontal: 20 }}>
 

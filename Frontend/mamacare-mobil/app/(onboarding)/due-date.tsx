@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import {
   View, Text, Image, TouchableOpacity,
-  ScrollView, TextInput, Modal, Dimensions,
+  ScrollView,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
+import DateTimePickerSheet from "../../components/DateTimePickerSheet";
 
-const { width } = Dimensions.get("window");
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function DueDateScreen() {
@@ -20,50 +20,9 @@ export default function DueDateScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
-  const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
-  const [pickerDay, setPickerDay] = useState(new Date().getDate());
-
-  const months = [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December",
-  ];
-
-  const getDaysInMonth = (month: number, year: number) =>
-    new Date(year, month + 1, 0).getDate();
-
-  const handleDateInput = (text: string) => {
-    const cleaned = text.replace(/\D/g, "");
-    let formatted = cleaned;
-    if (cleaned.length >= 3) formatted = cleaned.slice(0, 2) + "/" + cleaned.slice(2);
-    if (cleaned.length >= 5) formatted = cleaned.slice(0, 2) + "/" + cleaned.slice(2, 4) + "/" + cleaned.slice(4, 8);
-    setDate(formatted);
-    setError("");
-  };
-
-  const confirmPickerDate = () => {
-    const d = String(pickerDay).padStart(2, "0");
-    const m = String(pickerMonth + 1).padStart(2, "0");
-    setDate(`${m}/${d}/${pickerYear}`);
-    setShowPicker(false);
-    setError("");
-  };
-
-  // Convert mm/dd/yyyy to yyyy-MM-dd for API
-  const toISODate = (mmddyyyy: string) => {
-    const parts = mmddyyyy.split("/");
-    if (parts.length !== 3) return null;
-    return `${parts[2]}-${parts[0]}-${parts[1]}`;
-  };
-
   const validate = () => {
     if (!date.trim()) {
-      setError(isLMP ? "Please enter your last menstrual period date." : "Please enter your expected due date.");
-      return false;
-    }
-    const parts = date.split("/");
-    if (parts.length !== 3 || parts[2].length !== 4) {
-      setError("Please enter a valid date in mm/dd/yyyy format.");
+      setError(isLMP ? "Please select your last menstrual period date." : "Please select your expected due date.");
       return false;
     }
     return true;
@@ -74,14 +33,13 @@ export default function DueDateScreen() {
     setLoading(true);
     try {
       const token = await SecureStore.getItemAsync("accessToken");
-      const isoDate = toISODate(date);
 
       // Build pregnancy setup payload
       const payload: any = {};
       if (isLMP) {
-        payload.lastMenstrualPeriodDate = isoDate;
+        payload.lastMenstrualPeriod = date;
       } else {
-        payload.dueDate = isoDate;
+        payload.dueDate = date;
       }
 
       const response = await fetch(`${BASE_URL}/api/v1/pregnancy/setup`, {
@@ -115,16 +73,22 @@ export default function DueDateScreen() {
     }
   };
 
-  const days = Array.from({ length: getDaysInMonth(pickerMonth, pickerYear) }, (_, i) => i + 1);
-  const years = Array.from({ length: 3 }, (_, i) => new Date().getFullYear() - 1 + i);
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 36 }}
-        keyboardShouldPersistTaps="handled"
-      >
+      <DateTimePickerSheet
+        visible={showPicker}
+        mode="date"
+        title={isLMP ? "Select LMP Date" : "Select Due Date"}
+        initialValue={date}
+        onClose={() => setShowPicker(false)}
+        onConfirm={(value) => {
+          setDate(value);
+          setShowPicker(false);
+          setError("");
+        }}
+      />
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }} keyboardShouldPersistTaps="handled">
         {/* Header */}
         <View style={{
           flexDirection: "row", alignItems: "center",
@@ -191,15 +155,9 @@ export default function DueDateScreen() {
               justifyContent: "space-between",
             }}
           >
-            <TextInput
-              placeholder="mm/dd/yyyy"
-              placeholderTextColor="#BDBDBD"
-              value={date}
-              onChangeText={handleDateInput}
-              keyboardType="numeric"
-              maxLength={10}
-              style={{ flex: 1, fontSize: 15, color: "#333" }}
-            />
+            <Text style={{ flex: 1, fontSize: 15, color: date ? "#333" : "#BDBDBD" }}>
+              {date || "Select a date"}
+            </Text>
             <Ionicons name="calendar-outline" size={20} color="#2D7A4F" />
           </TouchableOpacity>
           {error ? (
@@ -242,89 +200,6 @@ export default function DueDateScreen() {
         </View>
       </ScrollView>
 
-      {/* Date Picker Modal */}
-      <Modal visible={showPicker} transparent animationType="slide">
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
-          <View style={{
-            backgroundColor: "#fff", borderTopLeftRadius: 24,
-            borderTopRightRadius: 24, padding: 24,
-          }}>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: "#111", marginBottom: 20, textAlign: "center" }}>
-              Select Date
-            </Text>
-
-            <Text style={{ fontSize: 12, fontWeight: "600", color: "#888", marginBottom: 8 }}>Month</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {months.map((m, i) => (
-                  <TouchableOpacity
-                    key={m}
-                    onPress={() => setPickerMonth(i)}
-                    style={{
-                      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-                      backgroundColor: pickerMonth === i ? "#2D7A4F" : "#F5F5F5",
-                    }}
-                  >
-                    <Text style={{ color: pickerMonth === i ? "#fff" : "#555", fontWeight: "600", fontSize: 13 }}>
-                      {m}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-
-            <Text style={{ fontSize: 12, fontWeight: "600", color: "#888", marginBottom: 8 }}>Day</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {days.map((d) => (
-                  <TouchableOpacity
-                    key={d}
-                    onPress={() => setPickerDay(d)}
-                    style={{
-                      width: 40, height: 40, borderRadius: 20,
-                      backgroundColor: pickerDay === d ? "#2D7A4F" : "#F5F5F5",
-                      alignItems: "center", justifyContent: "center",
-                    }}
-                  >
-                    <Text style={{ color: pickerDay === d ? "#fff" : "#555", fontWeight: "600" }}>{d}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-
-            <Text style={{ fontSize: 12, fontWeight: "600", color: "#888", marginBottom: 8 }}>Year</Text>
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 24 }}>
-              {years.map((y) => (
-                <TouchableOpacity
-                  key={y}
-                  onPress={() => setPickerYear(y)}
-                  style={{
-                    flex: 1, paddingVertical: 10, borderRadius: 12,
-                    backgroundColor: pickerYear === y ? "#2D7A4F" : "#F5F5F5",
-                    alignItems: "center",
-                  }}
-                >
-                  <Text style={{ color: pickerYear === y ? "#fff" : "#555", fontWeight: "600" }}>{y}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TouchableOpacity
-              onPress={confirmPickerDate}
-              style={{ backgroundColor: "#2D7A4F", borderRadius: 14, paddingVertical: 15, alignItems: "center" }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Confirm</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setShowPicker(false)}
-              style={{ paddingVertical: 12, alignItems: "center", marginTop: 4 }}
-            >
-              <Text style={{ color: "#888", fontSize: 14 }}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }

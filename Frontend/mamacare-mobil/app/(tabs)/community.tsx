@@ -3,6 +3,8 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   TextInput, ActivityIndicator, Modal,
   RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -273,7 +275,10 @@ export default function CommunityScreen() {
 
       {/* ── Ask Question Modal ── */}
       <Modal visible={showAskModal} transparent animationType="slide">
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <Text style={{ fontSize: 17, fontWeight: "800", color: "#111" }}>Ask a Question</Text>
@@ -281,19 +286,19 @@ export default function CommunityScreen() {
                 <Ionicons name="close" size={24} color="#555" />
               </TouchableOpacity>
             </View>
-            <TextInput
-              placeholder="What's on your mind, Mama?"
-              placeholderTextColor="#BDBDBD"
-              value={questionText}
-              onChangeText={setQuestionText}
-              multiline
-              numberOfLines={4}
-              style={{
-                borderWidth: 1, borderColor: "#EFEFEF", borderRadius: 12,
-                backgroundColor: "#FAFAFA", padding: 14, fontSize: 14,
-                color: "#333", minHeight: 100, textAlignVertical: "top", marginBottom: 16,
-              }}
-            />
+              <TextInput
+                placeholder="What's on your mind, Mama?"
+                placeholderTextColor="#BDBDBD"
+                value={questionText}
+                onChangeText={setQuestionText}
+                multiline
+                textAlignVertical="top"
+                style={{
+                  borderWidth: 1, borderColor: "#EFEFEF", borderRadius: 12,
+                  backgroundColor: "#FAFAFA", padding: 14, fontSize: 14,
+                  color: "#333", minHeight: 100, marginBottom: 16,
+                }}
+              />
             <TouchableOpacity
               onPress={handleAskQuestion}
               disabled={submitting}
@@ -305,12 +310,15 @@ export default function CommunityScreen() {
               }
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Discussion Detail Modal ── */}
       <Modal visible={showDiscussionModal} transparent animationType="slide">
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: "85%" }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
               <Text style={{ fontSize: 15, fontWeight: "800", color: "#111", flex: 1, marginRight: 12 }} numberOfLines={2}>
@@ -360,6 +368,9 @@ export default function CommunityScreen() {
                 placeholderTextColor="#BDBDBD"
                 value={replyText}
                 onChangeText={setReplyText}
+                returnKeyType="send"
+                blurOnSubmit={false}
+                onSubmitEditing={handleReply}
                 style={{
                   flex: 1, borderWidth: 1, borderColor: "#EFEFEF", borderRadius: 12,
                   backgroundColor: "#FAFAFA", paddingHorizontal: 14, height: 46, fontSize: 14, color: "#333",
@@ -377,7 +388,7 @@ export default function CommunityScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Header ── */}

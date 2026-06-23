@@ -25,6 +25,7 @@ const WHY_WALK = [
 export default function WalkScreen() {
   const [loading, setLoading] = useState(true);
   const [fitness, setFitness] = useState<any>(null);
+  const [sourceStatus, setSourceStatus] = useState<"loading" | "available" | "manual">("loading");
 
   useEffect(() => { loadFitness(); }, []);
 
@@ -32,13 +33,20 @@ export default function WalkScreen() {
     try {
       const headers = await authHeaders();
       const res = await fetch(`${BASE_URL}/api/v1/walk-exercise/home`, { headers });
-      if (res.ok) { const data = await res.json(); setFitness(data); }
+      if (res.ok) {
+        const data = await res.json();
+        setFitness(data);
+        setSourceStatus(data?.todayMetrics?.steps != null ? "available" : "manual");
+      } else {
+        setSourceStatus("manual");
+      }
     } catch (e) {}
     finally { setLoading(false); }
   };
 
   const goalMin = 15;
-  const todayMin = fitness?.todaysSteps ? Math.floor(fitness.todaysSteps / 100) : 0;
+  const todaySteps = fitness?.todayMetrics?.steps ?? fitness?.todaysSteps ?? 0;
+  const todayMin = todaySteps ? Math.max(1, Math.floor(todaySteps / 100)) : 0;
   const progress = Math.min(todayMin / goalMin, 1);
 
   return (
@@ -90,6 +98,17 @@ export default function WalkScreen() {
           </View>
         </View>
 
+        {!loading && sourceStatus === "manual" && (
+          <View style={{ marginHorizontal: 20, marginBottom: 16, backgroundColor: "#FFF8E1", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#F3D98A" }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#8A5D00", marginBottom: 4 }}>
+              We could not reach your phone activity data.
+            </Text>
+            <Text style={{ fontSize: 12, color: "#8A5D00", lineHeight: 18 }}>
+              Manual walk sessions are available below. Steps will only count from real movement.
+            </Text>
+          </View>
+        )}
+
         {/* Today's Goal */}
         {loading ? (
           <ActivityIndicator color="#2D7A4F" style={{ marginVertical: 20 }} />
@@ -112,7 +131,7 @@ export default function WalkScreen() {
               <View style={{ height: "100%", width: `${progress * 100}%`, backgroundColor: "#2D7A4F", borderRadius: 4 }} />
             </View>
             <Text style={{ fontSize: 12, color: "#888" }}>
-              {progress >= 1 ? "🎉 Goal achieved! Amazing work!" : "Let's move gently. You are doing great!"}
+              {progress >= 1 ? "Goal achieved! Amazing work!" : sourceStatus === "available" ? "Let's move gently. You are doing great!" : "Manual tracking is active."}
             </Text>
           </View>
         )}
@@ -175,7 +194,9 @@ export default function WalkScreen() {
             }}
           >
             <Ionicons name="walk-outline" size={22} color="#fff" />
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>Start Walk</Text>
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>
+              {sourceStatus === "available" ? "Start Walk" : "Start Manual Walk"}
+            </Text>
           </TouchableOpacity>
         </View>
 

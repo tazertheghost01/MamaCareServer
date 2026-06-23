@@ -58,6 +58,24 @@ export default function HomeScreen() {
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const [weeklyAudioUrl, setWeeklyAudioUrl] = useState<string | null>(null);
 
+  const resolvePregnancyWeek = (data: any) => {
+    const explicitWeek = Number(data?.week ?? data?.weeksOfPregnancy ?? data?.gestationalWeek);
+    if (Number.isFinite(explicitWeek) && explicitWeek > 0) {
+      return explicitWeek;
+    }
+
+    const dueDate = data?.dueDate || data?.due_date;
+    if (dueDate) {
+      const due = new Date(dueDate);
+      if (!Number.isNaN(due.getTime())) {
+        const diffDays = Math.max(0, Math.floor((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+        return Math.min(42, Math.max(1, Math.floor((280 - diffDays) / 7) + 1));
+      }
+    }
+
+    return 0;
+  };
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return t("good_morning");
@@ -107,7 +125,8 @@ export default function HomeScreen() {
       const response = await fetch(`${BASE_URL}/api/v1/pregnancy/me`, { headers });
       if (response.ok) {
         const data = await response.json();
-        setPregnancyWeeks(data.week);
+        const week = resolvePregnancyWeek(data);
+        setPregnancyWeeks(week > 0 ? week : null);
         // Calculate days to go from due date
         if (data.dueDate) {
           const due = new Date(data.dueDate);
@@ -116,7 +135,7 @@ export default function HomeScreen() {
           setDaysToGo(diff);
         }
         // Set trimester
-        const weeks = data.week || 0;
+        const weeks = week;
         if (weeks <= 12) setTrimester("1st Trimester");
         else if (weeks <= 26) setTrimester("2nd Trimester");
         else setTrimester("3rd Trimester");

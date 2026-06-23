@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import DateTimePickerSheet from "../../components/DateTimePickerSheet";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -59,15 +60,39 @@ export default function RemindersScreen() {
   const [pregnancyWeeks, setPregnancyWeeks] = useState<number>(0);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addType, setAddType] = useState<"appointment" | "medication">("appointment");
+  const [showAppointmentDatePicker, setShowAppointmentDatePicker] = useState(false);
+  const [showAppointmentTimePicker, setShowAppointmentTimePicker] = useState(false);
+  const [showMedicationTimePicker, setShowMedicationTimePicker] = useState(false);
 
   const [apptForm, setApptForm] = useState({
     title: "", description: "", appointmentDate: "",
-    appointmentType: "CHECKUP", reminderOffset: "ON_TIME",
+    appointmentTime: "09:00:00", appointmentType: "CHECKUP", reminderOffset: "ON_TIME",
   });
   const [medForm, setMedForm] = useState({
     medicationName: "", dosage: "", frequency: "DAILY",
-    quantity: "", reminderTime: "", notes: "",
+    quantity: "", reminderTime: "08:00:00", notes: "",
   });
+
+  const getFriendlySaveError = (data: any, fallback: string) => {
+    const raw = [data?.message, data?.detail, data?.error, data?.errors?.[0]?.message]
+      .find((value) => typeof value === "string" && value.trim().length > 0) as string | undefined;
+    if (raw && /deserialize|LocalDate|date|time|format|parse/i.test(raw)) {
+      return "Please choose the date and time using the picker.";
+    }
+    return fallback;
+  };
+
+  const formatAppointmentDate = () => {
+    if (!apptForm.appointmentDate) return "Select date";
+    return new Date(`${apptForm.appointmentDate}T12:00:00`).toLocaleDateString("en-NG", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const formatAppointmentTime = () => apptForm.appointmentTime ? apptForm.appointmentTime.slice(0, 5) : "Select time";
+  const formatMedicationTime = () => medForm.reminderTime ? medForm.reminderTime.slice(0, 5) : "Select time";
 
   useEffect(() => { loadData(); }, []);
 
@@ -96,7 +121,7 @@ export default function RemindersScreen() {
       }
       if (pregnancyRes.ok) {
         const data = await pregnancyRes.json();
-        setPregnancyWeeks(data.weeksOfPregnancy || 0);
+        setPregnancyWeeks(data.week || data.weeksOfPregnancy || data.gestationalWeek || 0);
       } else {
         // fallback from SecureStore
         const stored = await SecureStore.getItemAsync("pregnancyWeeks");
@@ -107,20 +132,18 @@ export default function RemindersScreen() {
   };
 
   const handleAddAppointment = async () => {
-    if (!apptForm.title || !apptForm.appointmentDate) {
-      Alert.alert("Missing fields", "Please fill in title and date.");
+    if (!apptForm.title || !apptForm.appointmentDate || !apptForm.appointmentTime) {
+      Alert.alert("Missing fields", "Please select a title, date, and time.");
       return;
     }
     try {
       const headers = await authHeaders();
-      const [appointmentDate, rawTime = "09:00:00"] = apptForm.appointmentDate.split("T");
-      const appointmentTime = rawTime.length === 5 ? `${rawTime}:00` : rawTime;
-      await fetch(`${BASE_URL}/api/v1/appointments/`, {
+      const response = await fetch(`${BASE_URL}/api/v1/appointments/`, {
         method: "POST", headers,
         body: JSON.stringify({
           appointment_type: mapAppointmentType(apptForm.appointmentType),
-          appointment_date: appointmentDate || apptForm.appointmentDate,
-          appointment_time: appointmentTime,
+          appointment_date: apptForm.appointmentDate,
+          appointment_time: apptForm.appointmentTime,
           timezone: "Africa/Lagos",
           location_name: apptForm.title.trim(),
           notes: apptForm.description.trim() || undefined,
@@ -128,21 +151,28 @@ export default function RemindersScreen() {
           reminder_offsets: [apptForm.reminderOffset],
         }),
       });
+      if (!response.ok && response.status !== 201) {
+        const data = await response.json().catch(() => ({}));
+        Alert.alert("Could not save appointment", getFriendlySaveError(data, "Please check the selected date and time and try again."));
+        return;
+      }
       setShowAddModal(false);
-      setApptForm({ title: "", description: "", appointmentDate: "", appointmentType: "CHECKUP", reminderOffset: "ON_TIME" });
+      setApptForm({ title: "", description: "", appointmentDate: "", appointmentTime: "09:00:00", appointmentType: "CHECKUP", reminderOffset: "ON_TIME" });
       loadData();
-    } catch (e) {}
+    } catch (e) {
+      Alert.alert("Could not save appointment", "Please check the selected date and time and try again.");
+    }
   };
 
   const handleAddMedication = async () => {
     if (!medForm.medicationName || !medForm.reminderTime) {
-      Alert.alert("Missing fields", "Please fill in medication name and reminder time.");
+      Alert.alert("Missing fields", "Please select a medication name and reminder time.");
       return;
     }
     try {
       const headers = await authHeaders();
       const today = new Date().toISOString().split("T")[0];
-      await fetch(`${BASE_URL}/api/v1/medications/`, {
+      const response = await fetch(`${BASE_URL}/api/v1/medications/`, {
         method: "POST", headers,
         body: JSON.stringify({
           medicine_name: medForm.medicationName,
@@ -152,14 +182,21 @@ export default function RemindersScreen() {
           timezone: "Africa/Lagos",
           reminder_enabled: true,
           reminder_offset: "ON_TIME",
-          medication_time: medForm.reminderTime + ":00",
+          medication_time: medForm.reminderTime,
           notes: medForm.notes,
         }),
       });
+      if (!response.ok && response.status !== 201) {
+        const data = await response.json().catch(() => ({}));
+        Alert.alert("Could not save medication", getFriendlySaveError(data, "Please check the selected time and try again."));
+        return;
+      }
       setShowAddModal(false);
-      setMedForm({ medicationName: "", dosage: "", frequency: "DAILY", quantity: "", reminderTime: "", notes: "" });
+      setMedForm({ medicationName: "", dosage: "", frequency: "DAILY", quantity: "", reminderTime: "08:00:00", notes: "" });
       loadData();
-    } catch (e) {}
+    } catch (e) {
+      Alert.alert("Could not save medication", "Please check the selected time and try again.");
+    }
   };
 
   const handleMarkMedTaken = async (medId: number) => {
@@ -256,6 +293,39 @@ export default function RemindersScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F8F8" }}>
+      <DateTimePickerSheet
+        visible={showAppointmentDatePicker}
+        mode="date"
+        title="Select Appointment Date"
+        initialValue={apptForm.appointmentDate}
+        onClose={() => setShowAppointmentDatePicker(false)}
+        onConfirm={(value) => {
+          setApptForm({ ...apptForm, appointmentDate: value });
+          setShowAppointmentDatePicker(false);
+        }}
+      />
+      <DateTimePickerSheet
+        visible={showAppointmentTimePicker}
+        mode="time"
+        title="Select Appointment Time"
+        initialValue={apptForm.appointmentTime}
+        onClose={() => setShowAppointmentTimePicker(false)}
+        onConfirm={(value) => {
+          setApptForm({ ...apptForm, appointmentTime: value });
+          setShowAppointmentTimePicker(false);
+        }}
+      />
+      <DateTimePickerSheet
+        visible={showMedicationTimePicker}
+        mode="time"
+        title="Select Reminder Time"
+        initialValue={medForm.reminderTime}
+        onClose={() => setShowMedicationTimePicker(false)}
+        onConfirm={(value) => {
+          setMedForm({ ...medForm, reminderTime: value });
+          setShowMedicationTimePicker(false);
+        }}
+      />
 
       {/* Add Modal */}
       <Modal visible={showAddModal} transparent animationType="slide">
@@ -287,7 +357,44 @@ export default function RemindersScreen() {
                 <View style={{ gap: 12 }}>
                   <FormField placeholder="Title" value={apptForm.title} onChangeText={(v: string) => setApptForm({ ...apptForm, title: v })} />
                   <FormField placeholder="Description" value={apptForm.description} onChangeText={(v: string) => setApptForm({ ...apptForm, description: v })} />
-                  <FormField placeholder="Date & Time (e.g. 2025-06-15T10:00:00)" value={apptForm.appointmentDate} onChangeText={(v: string) => setApptForm({ ...apptForm, appointmentDate: v })} />
+                  <TouchableOpacity
+                    onPress={() => setShowAppointmentDatePicker(true)}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "#EFEFEF",
+                      borderRadius: 12,
+                      backgroundColor: "#FAFAFA",
+                      paddingHorizontal: 14,
+                      height: 50,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, color: apptForm.appointmentDate ? "#333" : "#BDBDBD" }}>
+                      {apptForm.appointmentDate ? formatAppointmentDate() : "Select appointment date"}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={18} color="#2D7A4F" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowAppointmentTimePicker(true)}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "#EFEFEF",
+                      borderRadius: 12,
+                      backgroundColor: "#FAFAFA",
+                      paddingHorizontal: 14,
+                      height: 50,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, color: apptForm.appointmentTime ? "#333" : "#BDBDBD" }}>
+                      {apptForm.appointmentTime ? formatAppointmentTime() : "Select appointment time"}
+                    </Text>
+                    <Ionicons name="time-outline" size={18} color="#2D7A4F" />
+                  </TouchableOpacity>
                   <Text style={{ fontSize: 12, fontWeight: "600", color: "#444" }}>Appointment Type</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                     {APPOINTMENT_TYPES.map((t) => (
@@ -323,7 +430,25 @@ export default function RemindersScreen() {
                   <FormField placeholder="Medication name" value={medForm.medicationName} onChangeText={(v: string) => setMedForm({ ...medForm, medicationName: v })} />
                   <FormField placeholder="Dosage (e.g. 1 tablet)" value={medForm.dosage} onChangeText={(v: string) => setMedForm({ ...medForm, dosage: v })} />
                   <FormField placeholder="Quantity (e.g. 30)" value={medForm.quantity} onChangeText={(v: string) => setMedForm({ ...medForm, quantity: v })} keyboardType="numeric" />
-                  <FormField placeholder="Reminder time (e.g. 08:00)" value={medForm.reminderTime} onChangeText={(v: string) => setMedForm({ ...medForm, reminderTime: v })} />
+                  <TouchableOpacity
+                    onPress={() => setShowMedicationTimePicker(true)}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "#EFEFEF",
+                      borderRadius: 12,
+                      backgroundColor: "#FAFAFA",
+                      paddingHorizontal: 14,
+                      height: 50,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, color: medForm.reminderTime ? "#333" : "#BDBDBD" }}>
+                      {medForm.reminderTime ? formatMedicationTime() : "Select reminder time"}
+                    </Text>
+                    <Ionicons name="time-outline" size={18} color="#2D7A4F" />
+                  </TouchableOpacity>
                   <FormField placeholder="Notes (optional)" value={medForm.notes} onChangeText={(v: string) => setMedForm({ ...medForm, notes: v })} />
                   <TouchableOpacity onPress={handleAddMedication} style={{ backgroundColor: "#2D7A4F", borderRadius: 14, paddingVertical: 15, alignItems: "center", marginTop: 12 }}>
                     <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Save Medication</Text>
