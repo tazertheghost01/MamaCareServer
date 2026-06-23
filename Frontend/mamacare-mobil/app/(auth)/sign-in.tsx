@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,17 @@ import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
+
+// ------------------------------------------------------------------
+// 🔐 ADD YOUR GOOGLE CLIENT IDs HERE LATER
+// ------------------------------------------------------------------
+const GOOGLE_EXPO_CLIENT_ID = "YOUR_EXPO_CLIENT_ID_HERE";
+const GOOGLE_IOS_CLIENT_ID = "YOUR_IOS_CLIENT_ID_HERE";
+const GOOGLE_ANDROID_CLIENT_ID = "YOUR_ANDROID_CLIENT_ID_HERE";
+
+WebBrowser.maybeCompleteAuthSession();
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 const LOGIN_ENDPOINT = `${BASE_URL}/api/v1/auth/authenticate`;
@@ -24,6 +35,46 @@ export default function SignInScreen() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState({ email: "", password: "" });
+
+  // ── Google OAuth ──────────────────────────────────────────
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    clientId: GOOGLE_EXPO_CLIENT_ID,
+    iosClientId: GOOGLE_IOS_CLIENT_ID,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
+  });
+
+  useEffect(() => {
+    if (response?.type === "success") {
+      const { id_token } = response.params;
+      handleOAuthLogin("google", id_token);
+    }
+  }, [response]);
+
+  const handleOAuthLogin = async (provider: string, idToken: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/v1/auth/oauth2`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, idToken }),
+      });
+      
+      let data: any = {};
+      try { data = await res.json(); } catch (_) {}
+      
+      if (res.ok) {
+        await SecureStore.setItemAsync("accessToken", data.access_token);
+        await SecureStore.setItemAsync("refreshToken", data.refresh_token);
+        router.replace("/(tabs)/home");
+      } else {
+        showToast(data.message || data.detail || `Error logging in with ${provider}.`);
+      }
+    } catch (e) {
+      showToast("Network error. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ── Toast ────────────────────────────────────────────────
   const toastAnim = useRef(new Animated.Value(-100)).current;
@@ -219,7 +270,10 @@ export default function SignInScreen() {
                   </TouchableOpacity>
                 </View>
                 {errors.password ? <Text style={errorText}>{errors.password}</Text> : null}
-                <TouchableOpacity style={{ alignSelf: "flex-end", marginTop: 8 }}>
+                <TouchableOpacity 
+                  onPress={() => router.push("/(auth)/forgot-password")}
+                  style={{ alignSelf: "flex-end", marginTop: 8 }}
+                >
                   <Text style={{ color: "#2D7A4F", fontWeight: "600", fontSize: 13 }}>
                     Forgot Password?
                   </Text>
@@ -252,8 +306,20 @@ export default function SignInScreen() {
 
               {/* Social */}
               <View style={{ flexDirection: "row", gap: 12 }}>
-                <SocialBtn label="Google" icon="logo-google" />
-                <SocialBtn label="Apple" icon="logo-apple" />
+                <SocialBtn 
+                  label="Google" 
+                  icon="logo-google" 
+                  onPress={() => promptAsync()} 
+                  disabled={!request}
+                />
+                <SocialBtn 
+                  label="Apple" 
+                  icon="logo-apple" 
+                  onPress={() => {
+                    // Implement Apple sign in with expo-apple-authentication later
+                    showToast("Apple sign-in requires a physical iOS device.");
+                  }}
+                />
               </View>
 
               {/* Sign up */}
@@ -298,13 +364,17 @@ const errorText = {
   marginLeft: 4,
 };
 
-function SocialBtn({ label, icon }: { label: string; icon: any }) {
+function SocialBtn({ label, icon, onPress, disabled }: { label: string; icon: any; onPress?: () => void; disabled?: boolean }) {
   return (
-    <TouchableOpacity style={{
-      flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-      gap: 8, borderWidth: 1, borderColor: "#EFEFEF", borderRadius: 12,
-      paddingVertical: 13, backgroundColor: "#FAFAFA",
-    }}>
+    <TouchableOpacity 
+      onPress={onPress}
+      disabled={disabled}
+      style={{
+        flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+        gap: 8, borderWidth: 1, borderColor: "#EFEFEF", borderRadius: 12,
+        paddingVertical: 13, backgroundColor: disabled ? "#f0f0f0" : "#FAFAFA",
+        opacity: disabled ? 0.7 : 1,
+      }}>
       <Ionicons name={icon} size={18} color="#333" />
       <Text style={{ fontWeight: "600", fontSize: 14, color: "#333" }}>{label}</Text>
     </TouchableOpacity>

@@ -42,6 +42,14 @@ spring:
 # Keep your other settings below
 application:
   security:
+    oauth2:
+      client:
+        registration:
+          google:
+            # ----------------------------------------------------
+            # 🔐 ADD YOUR GOOGLE CLIENT ID HERE LATER
+            # ----------------------------------------------------
+            client-id: "[REPLACE_WITH_YOUR_GOOGLE_CLIENT_ID]"
     jwt:
       secret-key: cnHInY4GRVqKLB1PetMHWdJcJpP0CBhZyBhA5giUByE=
       expiration: 86400000

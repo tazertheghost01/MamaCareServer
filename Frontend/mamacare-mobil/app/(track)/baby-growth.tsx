@@ -113,7 +113,7 @@ export default function BabyGrowthScreen() {
             justifyContent: "center", alignItems: "center", marginBottom: 20 
           }}>
             <Image 
-              source={require("../assets/images/8.png")} 
+              source={require("../../assets/images/8.png")} 
               style={{ width: 100, height: 100 }} 
               resizeMode="contain" 
             />

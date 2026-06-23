@@ -64,6 +64,14 @@ import java.io.IOException;
 public class AuthenticationController {
 
     private final AuthenticationService service;
+    private final OAuth2Service oAuth2Service;
+
+    @PostMapping("/oauth2")
+    public ResponseEntity<AuthenticationResponse> authenticateWithOAuth2(
+            @RequestBody OAuth2LoginRequest request
+    ) {
+        return ResponseEntity.ok(oAuth2Service.authenticateWithOAuth2(request));
+    }
 
     @PostMapping("/register")
     public ResponseEntity<RegisterInitResponse> register(
@@ -92,5 +100,19 @@ public class AuthenticationController {
             HttpServletResponse response
     ) throws IOException {
         service.refreshToken(request, response);
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<RegisterInitResponse> forgotPassword(
+            @RequestBody ForgotPasswordRequest request
+    ) {
+        return ResponseEntity.ok(service.forgotPassword(request));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<RegisterInitResponse> resetPassword(
+            @RequestBody ResetPasswordRequest request
+    ) {
+        return ResponseEntity.ok(service.resetPassword(request));
     }
 }

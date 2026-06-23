@@ -18,6 +18,10 @@ public class OtpService {
     }
 
     private final Map<String, PendingEntry> store = new ConcurrentHashMap<>();
+    
+    private record ResetEntry(String otp, LocalDateTime expiresAt) {}
+    private final Map<String, ResetEntry> resetStore = new ConcurrentHashMap<>();
+    
     private final Random random = new Random();
 
     public String storePending(RegisterRequestDto request) {
@@ -40,5 +44,25 @@ public class OtpService {
             return Optional.empty();
         store.remove(email.toLowerCase());
         return Optional.of(entry.request());
+    }
+
+    public String storePasswordResetOtp(String email) {
+        String otp = String.format("%06d", random.nextInt(1_000_000));
+        resetStore.put(
+                email.toLowerCase(),
+                new ResetEntry(otp, LocalDateTime.now().plusMinutes(10)));
+        return otp;
+    }
+
+    public boolean verifyPasswordResetOtp(String email, String otp) {
+        ResetEntry entry = resetStore.get(email.toLowerCase());
+        if (entry == null) return false;
+        if (LocalDateTime.now().isAfter(entry.expiresAt())) {
+            resetStore.remove(email.toLowerCase());
+            return false;
+        }
+        if (!entry.otp().equals(otp)) return false;
+        resetStore.remove(email.toLowerCase());
+        return true;
     }
 }

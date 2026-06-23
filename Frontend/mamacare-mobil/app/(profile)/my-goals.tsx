@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View, Text, Image, TouchableOpacity,
   ScrollView, Modal, TextInput, Dimensions,
@@ -61,14 +61,14 @@ export default function MyGoalsScreen() {
       goals: prev.goals.map((g: any) => g.id === id ? { ...g, completed: !g.completed } : g),
       completed_count: prev.goals.find((g: any) => g.id === id)?.completed ? prev.completed_count - 1 : prev.completed_count + 1
     }));
-    
+
     try {
       const headers = await authHeaders();
       await fetch(`${BASE_URL}/api/v1/daily-goals/${id}/complete`, {
         method: "PATCH",
         headers,
       });
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const addGoal = async () => {
@@ -82,7 +82,7 @@ export default function MyGoalsScreen() {
         body: JSON.stringify({ title: newGoal.trim(), category: "WELLNESS" }),
       });
       await loadGoals(); // Reload fresh data
-    } catch (e) {}
+    } catch (e) { }
     setNewGoal("");
     setSaving(false);
     setShowModal(false);

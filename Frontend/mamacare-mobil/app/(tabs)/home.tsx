@@ -444,7 +444,7 @@ export default function HomeScreen() {
 
         {/* ── Pregnancy card ── */}
         <TouchableOpacity
-          onPress={() => router.push("/baby-growth")}
+          onPress={() => router.push("/(track)/baby-growth")}
           style={{
             marginHorizontal: 20, marginBottom: 16,
             backgroundColor: "#2D7A4F", borderRadius: 20,
@@ -510,7 +510,7 @@ export default function HomeScreen() {
                 key={i}
                 onPress={() => {
                   if (r.title === t("daily_walk")) {
-                    router.push("/walk");
+                    router.push("/(track)/walk");
                   } else {
                     router.push("/(tabs)/track");
                   }
@@ -562,6 +562,50 @@ export default function HomeScreen() {
               <Ionicons name="medical-outline" size={16} color="#D68000" />
               <Text style={{ color: "#D68000", fontWeight: "700", fontSize: 13 }}>+ Medication</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Quick Actions Grid */}
+          <View style={{ marginTop: 24 }}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: "#111", marginBottom: 12 }}>Explore Features</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+              
+              <TouchableOpacity 
+                onPress={() => router.push("/(track)/walk")}
+                style={{ flex: 1, minWidth: "45%", backgroundColor: "#F0F4FF", padding: 16, borderRadius: 16, alignItems: "center", gap: 8 }}>
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "#D1E0FF", alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name="walk-outline" size={24} color="#2F5BCA" />
+                </View>
+                <Text style={{ color: "#111", fontWeight: "700", fontSize: 13 }}>Walk & Exercise</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => router.push("/(profile)/my-goals")}
+                style={{ flex: 1, minWidth: "45%", backgroundColor: "#FFF4F0", padding: 16, borderRadius: 16, alignItems: "center", gap: 8 }}>
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "#FFE0D1", alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name="flag-outline" size={24} color="#D84C10" />
+                </View>
+                <Text style={{ color: "#111", fontWeight: "700", fontSize: 13 }}>Daily Goals</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => router.push("/(tabs)/community")}
+                style={{ flex: 1, minWidth: "45%", backgroundColor: "#F5F0FF", padding: 16, borderRadius: 16, alignItems: "center", gap: 8 }}>
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "#E6D1FF", alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name="people-outline" size={24} color="#7B2FCA" />
+                </View>
+                <Text style={{ color: "#111", fontWeight: "700", fontSize: 13 }}>Community</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => router.push("/(track)/baby-growth")}
+                style={{ flex: 1, minWidth: "45%", backgroundColor: "#F0FAF4", padding: 16, borderRadius: 16, alignItems: "center", gap: 8 }}>
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "#D1F0DE", alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name="heart-outline" size={24} color="#2D7A4F" />
+                </View>
+                <Text style={{ color: "#111", fontWeight: "700", fontSize: 13 }}>Baby Growth</Text>
+              </TouchableOpacity>
+
+            </View>
           </View>
         </View>
 

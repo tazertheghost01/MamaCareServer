@@ -256,6 +256,57 @@ public class AuthenticationService {
         mailSender.send(message);
     }
 
+    private void sendPasswordResetEmail(String email, String firstName, String otp) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(email);
+        message.setFrom("info@mamacareng.com");
+        message.setSubject("Reset Your MamaCare Password");
+        message.setText(
+                "Hi " + (firstName != null ? firstName : "there") + ",\n\n" +
+                "You requested a password reset. Your MamaCare verification code is:\n\n" +
+                "        " + otp + "\n\n" +
+                "This code expires in 10 minutes.\n" +
+                "Do not share it with anyone.\n\n" +
+                "If you did not request a password reset, please ignore this email or contact support.\n\n" +
+                "-- The MamaCare Team"
+        );
+        mailSender.send(message);
+    }
+
+    public RegisterInitResponse forgotPassword(ForgotPasswordRequest request) {
+        var user = repository.findByEmail(request.getEmail().toLowerCase())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "No account found with this email address."
+                ));
+        String otp = otpService.storePasswordResetOtp(user.getEmail());
+        sendPasswordResetEmail(user.getEmail(), user.getFullname(), otp);
+        return new RegisterInitResponse(
+                "A password reset code has been sent to " + user.getEmail(),
+                user.getEmail()
+        );
+    }
+
+    public RegisterInitResponse resetPassword(ResetPasswordRequest request) {
+        var user = repository.findByEmail(request.getEmail().toLowerCase())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "No account found with this email address."
+                ));
+        if (!otpService.verifyPasswordResetOtp(request.getEmail(), request.getOtp())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid or expired OTP. Please try again."
+            );
+        }
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        repository.save(user);
+        return new RegisterInitResponse(
+                "Your password has been successfully reset. You can now log in.",
+                user.getEmail()
+        );
+    }
+
     private void saveUserToken(User user, String jwtToken) {
         var token = Token.builder()
                 .user(user)
