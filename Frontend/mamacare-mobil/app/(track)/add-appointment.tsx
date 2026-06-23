@@ -21,9 +21,9 @@ const TYPE_LABELS: Record<string, string> = {
   BLOOD_TEST: "Blood Test", DELIVERY: "Delivery", FOLLOW_UP: "Follow Up",
 };
 const REMINDER_OPTIONS = [
-  { label: "1 day before", value: "PT_1_DAY" },
-  { label: "6 hours before", value: "PT_6_HOURS" },
-  { label: "1 hour before", value: "PT_1_HOUR" },
+  { label: "On time", value: "ON_TIME" },
+  { label: "15 mins before", value: "FIFTEEN_MINUTES_BEFORE" },
+  { label: "30 mins before", value: "THIRTY_MINUTES_BEFORE" },
 ];
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -36,7 +36,7 @@ export default function AddAppointmentScreen() {
     hour: 10, minute: 0, ampm: "AM",
     location: "",
     notes: "",
-    reminder: "PT_1_DAY",
+    reminder: "ON_TIME",
     reminderEnabled: true,
   });
   const [showTypePicker, setShowTypePicker] = useState(false);
@@ -58,28 +58,49 @@ export default function AddAppointmentScreen() {
     ]).start();
   };
 
-  const buildDateTime = () => {
-    const h = form.ampm === "PM" && form.hour !== 12 ? form.hour + 12 : form.ampm === "AM" && form.hour === 12 ? 0 : form.hour;
+  const buildDate = () => {
     const mm = String(form.month + 1).padStart(2, "0");
     const dd = String(form.day).padStart(2, "0");
+    return `${form.year}-${mm}-${dd}`;
+  };
+
+  const buildTime = () => {
+    const h = form.ampm === "PM" && form.hour !== 12 ? form.hour + 12 : form.ampm === "AM" && form.hour === 12 ? 0 : form.hour;
     const hh = String(h).padStart(2, "0");
     const min = String(form.minute).padStart(2, "0");
-    return `${form.year}-${mm}-${dd}T${hh}:${min}:00`;
+    return `${hh}:${min}:00`;
+  };
+
+  const mapType = (type: string) => {
+    switch (type) {
+      case "CHECKUP": return "ANTENATAL";
+      case "ULTRASOUND": return "ULTRASOUND";
+      case "BLOOD_TEST": return "LAB_TEST";
+      case "DELIVERY": return "OTHER";
+      case "FOLLOW_UP": return "DOCTOR_CONSULTATION";
+      default: return "OTHER";
+    }
   };
 
   const handleSave = async () => {
+    if (!form.location.trim()) {
+      showToast("Please add a location for the appointment.");
+      return;
+    }
     setSaving(true);
     try {
       const headers = await authHeaders();
-      const response = await fetch(`${BASE_URL}/api/v1/appointments/`, {
+      const response = await fetch(`${BASE_URL}/api/v1/appointments`, {
         method: "POST", headers,
         body: JSON.stringify({
-          title: TYPE_LABELS[form.type] + " Appointment",
-          description: form.location || form.notes || "",
-          appointmentDate: buildDateTime(),
-          appointmentType: form.type,
-          reminderOffsets: form.reminderEnabled ? [form.reminder] : [],
-          checklistItems: [],
+          appointment_type: mapType(form.type),
+          appointment_date: buildDate(),
+          appointment_time: buildTime(),
+          timezone: "Africa/Lagos",
+          location_name: form.location.trim() || undefined,
+          notes: form.notes.trim() || undefined,
+          reminder_enabled: form.reminderEnabled,
+          reminder_offsets: form.reminderEnabled ? [form.reminder] : [],
         }),
       });
       if (response.ok || response.status === 201) {

@@ -33,6 +33,30 @@ const STATUS_STYLES = {
   Archived: "bg-gray-100 text-gray-500",
 };
 
+const LANGUAGE_LABELS = {
+  ENGLISH: "English",
+  YORUBA: "Yoruba",
+  PIDGIN: "Pidgin",
+  HAUSA: "Hausa",
+};
+
+const CATEGORY_LABELS = {
+  ONBOARDING: "Onboarding",
+  HEALTH_TIPS: "Health Tips",
+  BABY_GROWTH: "Baby Growth",
+  WALK_EXERCISE: "Walk Exercise",
+  MEDICATION: "Medication",
+  APPOINTMENT: "Appointment",
+  COMMUNITY: "Community",
+  GENERAL: "General",
+};
+
+const STATUS_LABELS = {
+  PUBLISHED: "Published",
+  DRAFT: "Draft",
+  ARCHIVED: "Archived",
+};
+
 function LanguageBadge({ language }) {
   return (
     <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${LANGUAGE_STYLES[language] || "bg-gray-100 text-gray-500"}`}>
@@ -82,12 +106,21 @@ export default function AudioLibraryPage() {
     const token = localStorage.getItem("mc_token");
     if (!token) { setLoading(false); return; }
 
-    fetch(`${BASE_URL}/api/v1/audio`, {
+    fetch(`${BASE_URL}/api/v1/admin/audio-library`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => setTracks(
-        Array.isArray(data) ? data : data?.audio || data?.tracks || data?.content || []
+        (Array.isArray(data) ? data : data?.audio || data?.tracks || data?.content || []).map(item => ({
+          ...item,
+          title: item.title || item.name || "Untitled",
+          category: CATEGORY_LABELS[item.category] || item.category || "General",
+          language: LANGUAGE_LABELS[item.language] || item.language || "English",
+          duration: item.durationSeconds ?? item.duration_seconds ?? item.duration ?? "—",
+          status: STATUS_LABELS[item.status] || item.status || "Draft",
+          updatedOn: item.updatedAt || item.updated_on || "—",
+          audioUrl: item.publicUrl || item.public_url || item.audioUrl,
+        }))
       ))
       .catch(() => setError(true))
       .finally(() => setLoading(false));

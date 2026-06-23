@@ -19,15 +19,29 @@ async function authHeaders() {
 }
 
 const APPOINTMENT_TYPES = ["CHECKUP", "ULTRASOUND", "BLOOD_TEST", "DELIVERY", "FOLLOW_UP"];
-const REMINDER_OFFSETS = ["PT_5_MINUTES", "PT_15_MINUTES", "PT_30_MINUTES", "PT_1_HOUR", "PT_1_DAY", "PT_3_DAYS"];
+const REMINDER_OFFSETS = ["ON_TIME", "FIFTEEN_MINUTES_BEFORE", "THIRTY_MINUTES_BEFORE"];
 const OFFSET_LABELS: Record<string, string> = {
-  PT_5_MINUTES: "5 mins before",
-  PT_15_MINUTES: "15 mins before",
-  PT_30_MINUTES: "30 mins before",
-  PT_1_HOUR: "1 hour before",
-  PT_1_DAY: "1 day before",
-  PT_3_DAYS: "3 days before",
+  ON_TIME: "On time",
+  FIFTEEN_MINUTES_BEFORE: "15 mins before",
+  THIRTY_MINUTES_BEFORE: "30 mins before",
 };
+
+function mapAppointmentType(type: string) {
+  switch (type) {
+    case "CHECKUP":
+      return "ANTENATAL";
+    case "ULTRASOUND":
+      return "ULTRASOUND";
+    case "BLOOD_TEST":
+      return "LAB_TEST";
+    case "DELIVERY":
+      return "OTHER";
+    case "FOLLOW_UP":
+      return "DOCTOR_CONSULTATION";
+    default:
+      return "OTHER";
+  }
+}
 
 function getTrimester(weeks: number) {
   if (weeks <= 12) return "1st Trimester";
@@ -48,7 +62,7 @@ export default function RemindersScreen() {
 
   const [apptForm, setApptForm] = useState({
     title: "", description: "", appointmentDate: "",
-    appointmentType: "CHECKUP", reminderOffset: "PT_1_DAY",
+    appointmentType: "CHECKUP", reminderOffset: "ON_TIME",
   });
   const [medForm, setMedForm] = useState({
     medicationName: "", dosage: "", frequency: "DAILY",
@@ -70,11 +84,11 @@ export default function RemindersScreen() {
 
       if (apptRes.ok) {
         const data = await apptRes.json();
-        setAppointments(data ? [data] : []);
+        setAppointments(data?.appointment ? [data.appointment] : []);
       }
       if (medRes.ok) {
         const data = await medRes.json();
-        setMedications(Array.isArray(data) ? data : data.medicationsDueToday || []);
+        setMedications(Array.isArray(data) ? data : data.today_medications || []);
       }
       if (walkRes.ok) {
         const data = await walkRes.json();
@@ -99,17 +113,23 @@ export default function RemindersScreen() {
     }
     try {
       const headers = await authHeaders();
+      const [appointmentDate, rawTime = "09:00:00"] = apptForm.appointmentDate.split("T");
+      const appointmentTime = rawTime.length === 5 ? `${rawTime}:00` : rawTime;
       await fetch(`${BASE_URL}/api/v1/appointments/`, {
         method: "POST", headers,
         body: JSON.stringify({
-          title: apptForm.title, description: apptForm.description,
-          appointmentDate: apptForm.appointmentDate,
-          appointmentType: apptForm.appointmentType,
-          reminderOffsets: [apptForm.reminderOffset], checklistItems: [],
+          appointment_type: mapAppointmentType(apptForm.appointmentType),
+          appointment_date: appointmentDate || apptForm.appointmentDate,
+          appointment_time: appointmentTime,
+          timezone: "Africa/Lagos",
+          location_name: apptForm.title.trim(),
+          notes: apptForm.description.trim() || undefined,
+          reminder_enabled: true,
+          reminder_offsets: [apptForm.reminderOffset],
         }),
       });
       setShowAddModal(false);
-      setApptForm({ title: "", description: "", appointmentDate: "", appointmentType: "CHECKUP", reminderOffset: "PT_1_DAY" });
+      setApptForm({ title: "", description: "", appointmentDate: "", appointmentType: "CHECKUP", reminderOffset: "ON_TIME" });
       loadData();
     } catch (e) {}
   };
@@ -121,14 +141,19 @@ export default function RemindersScreen() {
     }
     try {
       const headers = await authHeaders();
+      const today = new Date().toISOString().split("T")[0];
       await fetch(`${BASE_URL}/api/v1/medications/`, {
         method: "POST", headers,
         body: JSON.stringify({
-          medicationName: medForm.medicationName, dosage: medForm.dosage,
-          frequency: medForm.frequency, dosageUnit: "tablet",
-          quantity: parseInt(medForm.quantity) || 30,
-          prescribedDate: new Date().toISOString().split("T")[0],
-          reminderTime: medForm.reminderTime + ":00", notes: medForm.notes,
+          medicine_name: medForm.medicationName,
+          dose: medForm.dosage,
+          frequency: medForm.frequency,
+          start_date: today,
+          timezone: "Africa/Lagos",
+          reminder_enabled: true,
+          reminder_offset: "ON_TIME",
+          medication_time: medForm.reminderTime + ":00",
+          notes: medForm.notes,
         }),
       });
       setShowAddModal(false);
@@ -160,14 +185,14 @@ export default function RemindersScreen() {
       id: a.id,
       type: "appointment",
       icon: "calendar-outline" as const,
-      title: a.title || "Antenatal Appointment",
+      title: a.appointmentTypeLabel || a.locationName || "Antenatal Appointment",
       date: a.appointmentDate
-        ? new Date(a.appointmentDate).toLocaleDateString("en-NG", {
+        ? new Date(`${a.appointmentDate}T${a.appointmentTime || "00:00:00"}`).toLocaleDateString("en-NG", {
             month: "short", day: "numeric", year: "numeric",
             hour: "2-digit", minute: "2-digit",
           })
         : "",
-      sub: a.daysUntilAppointment != null ? `In ${a.daysUntilAppointment} days` : "",
+      sub: a.daysToGo != null ? `In ${a.daysToGo} days` : "",
       completed: a.status === "COMPLETED",
       color: "#F0FAF4",
       route: "/(track)/appointment",
@@ -179,13 +204,13 @@ export default function RemindersScreen() {
       id: m.medicationId || m.id,
       type: "medication",
       icon: "medical-outline" as const,
-      title: m.medicationName,
-      date: m.reminderTime ? formatTime(m.reminderTime) : "",
+      title: m.medicine_name || m.medicationName,
+      date: m.medication_time ? formatTime(m.medication_time) : (m.reminderTime ? formatTime(m.reminderTime) : ""),
       sub: "Daily reminder",
-      completed: m.isTaken || false,
+      completed: m.taken_today || m.isTaken || false,
       color: "#FFF8F0",
       route: "/(track)/medication",
-      badge: !m.isTaken ? "Mark Taken" : null,
+      badge: !m.taken_today && !m.isTaken ? "Mark Taken" : null,
     })),
 
     // Walk — from API + goal progress

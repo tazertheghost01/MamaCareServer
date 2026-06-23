@@ -26,14 +26,11 @@ async function authHeaders() {
 }
 
 const APPOINTMENT_TYPES = ["ANTENATAL", "ULTRASOUND", "LAB_TEST", "DOCTOR_CONSULTATION", "VACCINATION", "OTHER"];
-const REMINDER_OFFSETS = ["PT_5_MINUTES", "PT_15_MINUTES", "PT_30_MINUTES", "PT_1_HOUR", "PT_1_DAY", "PT_3_DAYS"];
+const REMINDER_OFFSETS = ["ON_TIME", "FIFTEEN_MINUTES_BEFORE", "THIRTY_MINUTES_BEFORE"];
 const OFFSET_LABELS: Record<string, string> = {
-  PT_5_MINUTES: "5 mins before",
-  PT_15_MINUTES: "15 mins before",
-  PT_30_MINUTES: "30 mins before",
-  PT_1_HOUR: "1 hour before",
-  PT_1_DAY: "1 day before",
-  PT_3_DAYS: "3 days before",
+  ON_TIME: "On time",
+  FIFTEEN_MINUTES_BEFORE: "15 mins before",
+  THIRTY_MINUTES_BEFORE: "30 mins before",
 };
 
 export default function TrackScreen() {
@@ -52,7 +49,7 @@ export default function TrackScreen() {
     description: "",
     appointmentDate: "",
     appointmentType: "ANTENATAL",
-    reminderOffset: "PT_1_DAY",
+    reminderOffset: "ON_TIME",
   });
 
   // Add medication form
@@ -89,11 +86,11 @@ export default function TrackScreen() {
 
       if (apptRes.ok) {
         const data = await apptRes.json();
-        setAppointments(data ? [data] : []);
+        setAppointments(data?.appointment ? [data.appointment] : []);
       }
       if (medRes.ok) {
         const data = await medRes.json();
-        setMedications(Array.isArray(data) ? data : []);
+        setMedications(Array.isArray(data) ? data : data.today_medications || []);
       }
     } catch (e) {
       // No connection — show empty state
@@ -135,7 +132,7 @@ export default function TrackScreen() {
 
       if (response.ok || response.status === 201) {
         setShowAddModal(false);
-        setApptForm({ title: "", description: "", appointmentDate: "", appointmentType: "ANTENATAL", reminderOffset: "PT_1_DAY" });
+        setApptForm({ title: "", description: "", appointmentDate: "", appointmentType: "ANTENATAL", reminderOffset: "ON_TIME" });
         loadData();
       } else {
         const data = await response.json().catch(() => ({}));
@@ -167,7 +164,7 @@ export default function TrackScreen() {
           medication_time: timeStr,
           start_date: new Date().toISOString().split("T")[0],
           reminder_enabled: true,
-          reminder_offset: "PT_15_MINUTES",
+          reminder_offset: "ON_TIME",
           notes: medForm.notes,
         }),
       });
@@ -202,13 +199,13 @@ export default function TrackScreen() {
       id: a.id,
       type: "appointment",
       icon: "calendar-outline",
-      title: a.title,
+      title: a.appointmentTypeLabel || a.locationName || "Antenatal Appointment",
       date: a.appointmentDate
-        ? new Date(a.appointmentDate).toLocaleDateString("en-NG", {
+        ? new Date(`${a.appointmentDate}T${a.appointmentTime || "00:00:00"}`).toLocaleDateString("en-NG", {
             month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit",
           })
         : "",
-      sub: a.daysUntilAppointment != null ? `In ${a.daysUntilAppointment} days` : "",
+      sub: a.daysToGo != null ? `In ${a.daysToGo} days` : "",
       completed: a.status === "COMPLETED",
       color: "#F0FAF4",
     })),
@@ -216,10 +213,10 @@ export default function TrackScreen() {
       id: m.medicationId || m.id,
       type: "medication",
       icon: "medical-outline",
-      title: m.medicationName,
-      date: m.reminderTime?.slice(0, 5) || "",
+      title: m.medicine_name || m.medicationName,
+      date: m.medication_time?.slice(0, 5) || m.reminderTime?.slice(0, 5) || "",
       sub: "Daily reminder",
-      completed: m.isTaken || false,
+      completed: m.taken_today || m.isTaken || false,
       color: "#FFF8F0",
     })),
     {

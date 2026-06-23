@@ -107,7 +107,7 @@ export default function AnalyticsPage() {
       fetch(`${BASE_URL}/api/v1/pregnancy/me`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch(`${BASE_URL}/api/v1/medications`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch(`${BASE_URL}/api/v1/appointments/upcoming/next`, { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`${BASE_URL}/api/v1/audio`, { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${BASE_URL}/api/v1/admin/audio-library`, { headers: { Authorization: `Bearer ${token}` } }),
     ])
       .then(async ([summaryRes, pregRes, medRes, apptRes, audioRes]) => {
         const sumData = summaryRes.status === "fulfilled" ? await summaryRes.value.json().catch(() => ({})) : {};

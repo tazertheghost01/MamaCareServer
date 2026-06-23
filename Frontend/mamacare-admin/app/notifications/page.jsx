@@ -21,6 +21,22 @@ function StatusBadge({ status }) {
   );
 }
 
+const STATUS_LABELS = {
+  DRAFT: "Pending",
+  SCHEDULED: "Scheduled",
+  SENT: "Sent",
+  FAILED: "Failed",
+};
+
+const TYPE_LABELS = {
+  REMINDER: "Reminder",
+  MEDICATION: "Medication",
+  WALK: "Walk",
+  GENERAL: "General",
+  ALERT: "Alert",
+  COMMUNITY: "General",
+};
+
 function TypeBadge({ type }) {
   const colors = {
     Reminder: "bg-purple-50 text-purple-600",
@@ -127,38 +143,25 @@ export default function NotificationsPage() {
     const token = localStorage.getItem("mc_token");
     if (!token) { setLoading(false); return; }
 
-    // Fetch from available endpoints and map to notification format
-    Promise.all([
-      fetch(`${BASE_URL}/api/v1/medications`, { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`${BASE_URL}/api/v1/appointments/upcoming/next`, { headers: { Authorization: `Bearer ${token}` } })
-    ])
-      .then(async ([medRes, apptRes]) => {
-        const meds = await medRes.json().then(d => Array.isArray(d) ? d : d?.medications || []);
-        const appts = await apptRes.json().then(d => Array.isArray(d) ? d : d?.appointments || []);
-
-        const mappedMeds = meds.map(m => ({
-          id: m.id,
-          title: m.title || "Medication Reminder",
-          message: "Time to take your medication",
-          type: "Medication",
-          audience: "All Users",
-          status: m.status || "Sent",
-          scheduledTime: m.scheduledTime || m.scheduledAt,
-          sentOn: m.sentOn || m.updatedAt,
+    fetch(`${BASE_URL}/api/v1/admin/notifications`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (notificationRes) => {
+        if (!notificationRes.ok) {
+          throw new Error("Failed to load notifications");
+        }
+        const raw = await notificationRes.json().catch(() => []);
+        const mapped = (Array.isArray(raw) ? raw : raw?.notifications || raw?.content || []).map(n => ({
+          id: n.id,
+          title: n.title || "Notification",
+          message: n.body || n.message || "",
+          type: TYPE_LABELS[n.type] || n.type || "General",
+          audience: n.audience || "All Users",
+          status: STATUS_LABELS[n.status] || n.status || "Pending",
+          scheduledTime: n.scheduledAt || n.scheduled_time || "—",
+          sentOn: n.sentAt || n.sent_at || "—",
         }));
-
-        const mappedAppts = appts.map(a => ({
-          id: a.id,
-          title: "Appointment Reminder",
-          message: "Reminder for upcoming appointment",
-          type: "Reminder",
-          audience: "All Users",
-          status: a.status === "Upcoming" ? "Scheduled" : a.status,
-          scheduledTime: a.dateTime || a.appointmentDate,
-          sentOn: a.sentOn,
-        }));
-
-        setNotifications([...mappedMeds, ...mappedAppts]);
+        setNotifications(mapped);
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
@@ -197,7 +200,7 @@ export default function NotificationsPage() {
 
         {/* Tabs */}
         <div className="flex flex-wrap items-center gap-3 bg-white rounded-2xl border border-gray-100 p-4">
-          {["All Notifications", "Scheduled", "Sent", "Drafts", "Failed"].map(tab => (
+          {["All Notifications", "Scheduled", "Sent", "Pending", "Failed"].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -254,3 +257,4 @@ export default function NotificationsPage() {
     </>
   );
 }
+

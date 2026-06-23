@@ -15,15 +15,14 @@ async function authHeaders() {
   return { "Content-Type": "application/json", "Authorization": `Bearer ${token}` };
 }
 
-const FREQUENCIES = ["DAILY", "TWICE_DAILY", "THREE_TIMES_DAILY", "WEEKLY"];
+const FREQUENCIES = ["DAILY", "WEEKLY", "AS_NEEDED"];
 const FREQ_LABELS: Record<string, string> = {
-  DAILY: "Daily", TWICE_DAILY: "Twice Daily",
-  THREE_TIMES_DAILY: "3x Daily", WEEKLY: "Weekly",
+  DAILY: "Daily", WEEKLY: "Weekly", AS_NEEDED: "As Needed",
 };
 const REMINDER_OPTIONS = [
-  { label: "On time", value: "0" },
-  { label: "15 mins before", value: "15" },
-  { label: "30 mins before", value: "30" },
+  { label: "On time", value: "ON_TIME" },
+  { label: "15 mins before", value: "FIFTEEN_MINUTES_BEFORE" },
+  { label: "30 mins before", value: "THIRTY_MINUTES_BEFORE" },
 ];
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
 const MINUTES = [0, 15, 30, 45];
@@ -39,7 +38,7 @@ export default function AddMedicationScreen() {
     startMonth: new Date().getMonth(),
     startYear: new Date().getFullYear(),
     notes: "",
-    reminder: "0",
+    reminder: "ON_TIME",
   });
   const [showFreqPicker, setShowFreqPicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -84,16 +83,18 @@ export default function AddMedicationScreen() {
     setSaving(true);
     try {
       const headers = await authHeaders();
-      const response = await fetch(`${BASE_URL}/api/v1/medications/`, {
+
+      const response = await fetch(`${BASE_URL}/api/v1/medications`, {
         method: "POST", headers,
         body: JSON.stringify({
-          medicationName: form.medicationName.trim(),
-          dosage: form.dosage.trim(),
+          medicine_name: form.medicationName.trim(),
+          dose: form.dosage.trim(),
           frequency: form.frequency,
-          dosageUnit: "tablet",
-          quantity: 30,
-          prescribedDate: buildDate(),
-          reminderTime: buildTime(),
+          medication_time: buildTime(),
+          start_date: buildDate(),
+          timezone: "Africa/Lagos",
+          reminder_enabled: true,
+          reminder_offset: form.reminder,
           notes: form.notes.trim() || undefined,
         }),
       });

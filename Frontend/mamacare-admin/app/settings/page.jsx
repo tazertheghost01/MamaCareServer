@@ -129,6 +129,15 @@ function useSaveState() {
   return { saving, saved, save };
 }
 
+function readSetting(settings, key, fallback = "") {
+  return settings && settings[key] !== undefined ? settings[key] : fallback;
+}
+
+function toBool(value, fallback = false) {
+  if (value === undefined || value === null || value === "") return fallback;
+  return value === true || value === "true";
+}
+
 export default function SettingsPage() {
   // General
   const [platformName, setPlatformName] = useState("MamaCare");
@@ -184,46 +193,39 @@ export default function SettingsPage() {
     })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
-        if (data.platformName) setPlatformName(data.platformName);
-        if (data.adminEmail) setAdminEmail(data.adminEmail);
-        if (data.timezone) setTimezone(data.timezone);
-        if (data.dateFormat) setDateFormat(data.dateFormat);
-        if (data.notifications) {
-          const n = data.notifications;
-          if (n.newUserRegistration !== undefined) setNotifNewUser(n.newUserRegistration);
-          if (n.appointmentBooked !== undefined) setNotifAppointment(n.appointmentBooked);
-          if (n.reminderAlerts !== undefined) setNotifReminder(n.reminderAlerts);
-          if (n.communityReports !== undefined) setNotifCommunity(n.communityReports);
-          if (n.systemAlerts !== undefined) setNotifSystem(n.systemAlerts);
-          if (n.weeklySummary !== undefined) setNotifWeekly(n.weeklySummary);
-        }
-        if (data.defaultLanguage) setDefaultLang(data.defaultLanguage);
-        if (data.supportedLanguages) {
-          const l = data.supportedLanguages;
-          if (l.English !== undefined) setLangEnglish(l.English);
-          if (l.Yoruba !== undefined) setLangYoruba(l.Yoruba);
-          if (l.Hausa !== undefined) setLangHausa(l.Hausa);
-          if (l.Igbo !== undefined) setLangIgbo(l.Igbo);
-          if (l.Pidgin !== undefined) setLangPidgin(l.Pidgin);
-        }
-        if (data.security) {
-          const s = data.security;
-          if (s.twoFactorAuth !== undefined) setTwoFactor(s.twoFactorAuth);
-          if (s.loginAlerts !== undefined) setLoginAlerts(s.loginAlerts);
-          if (s.sessionTimeout) setSessionTimeout(s.sessionTimeout);
-        }
-        if (data.platform) {
-          const p = data.platform;
-          if (p.maintenanceMode !== undefined) setMaintenanceMode(p.maintenanceMode);
-          if (p.allowUserRegistration !== undefined) setAllowRegistration(p.allowUserRegistration);
-          if (p.emailVerification !== undefined) setEmailVerification(p.emailVerification);
-        }
-        if (data.backup) {
-          const b = data.backup;
-          if (b.frequency) setBackupFrequency(b.frequency);
-          if (b.lastBackup) setLastBackup(b.lastBackup);
-          if (b.status) setBackupStatus(b.status);
-        }
+        const settings = data.settings || data || {};
+        setPlatformName(readSetting(settings, "platform.name", "MamaCare"));
+        setAdminEmail(readSetting(settings, "platform.admin_email", "admin@mamacare.com"));
+        setTimezone(readSetting(settings, "platform.timezone", "(GMT+01:00) West Africa Time"));
+        setDateFormat(readSetting(settings, "platform.date_format", "MMM DD, YYYY"));
+
+        setNotifNewUser(toBool(readSetting(settings, "notifications.new_user_registration", "true")));
+        setNotifAppointment(toBool(readSetting(settings, "notifications.appointment_booked", "true")));
+        setNotifReminder(toBool(readSetting(settings, "notifications.reminder_alerts", "true")));
+        setNotifCommunity(toBool(readSetting(settings, "notifications.community_reports", "true")));
+        setNotifSystem(toBool(readSetting(settings, "notifications.system_alerts", "true")));
+        setNotifWeekly(toBool(readSetting(settings, "notifications.weekly_summary", "false")));
+
+        setDefaultLang(readSetting(settings, "language.default", "English"));
+        setLangEnglish(toBool(readSetting(settings, "language.english", "true")));
+        setLangYoruba(toBool(readSetting(settings, "language.yoruba", "true")));
+        setLangHausa(toBool(readSetting(settings, "language.hausa", "true")));
+        setLangIgbo(toBool(readSetting(settings, "language.igbo", "true")));
+        setLangPidgin(toBool(readSetting(settings, "language.pidgin", "false")));
+
+        setTwoFactor(toBool(readSetting(settings, "security.two_factor_authentication", "false")));
+        setLoginAlerts(toBool(readSetting(settings, "security.login_alerts", "true")));
+        const timeout = readSetting(settings, "security.session_timeout_minutes", "30");
+        setSessionTimeout(`${timeout} minutes`);
+
+        setMaintenanceMode(toBool(readSetting(settings, "platform.maintenance_mode", "false")));
+        setAllowRegistration(toBool(readSetting(settings, "platform.allow_user_registration", "true")));
+        setEmailVerification(toBool(readSetting(settings, "platform.email_verification_required", "true")));
+
+        const backupFrequencySetting = readSetting(settings, "backup.frequency", "daily");
+        setBackupFrequency(backupFrequencySetting.charAt(0).toUpperCase() + backupFrequencySetting.slice(1).toLowerCase());
+        setLastBackup(readSetting(settings, "backup.last_backup", "n/a"));
+        setBackupStatus(readSetting(settings, "backup.status", "Completed"));
       })
       .catch(() => {/* use defaults silently */})
       .finally(() => setLoadingSettings(false));
@@ -235,7 +237,7 @@ export default function SettingsPage() {
     await fetch(`${BASE_URL}/api/v1/admin/settings`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ settings: payload }),
     });
   };
 
@@ -256,7 +258,12 @@ export default function SettingsPage() {
           icon={Settings}
           saving={generalSave.saving}
           saved={generalSave.saved}
-          onSave={() => generalSave.save(() => patchSettings({ platformName, adminEmail, timezone, dateFormat }))}
+          onSave={() => generalSave.save(() => patchSettings({
+            "platform.name": platformName,
+            "platform.admin_email": adminEmail,
+            "platform.timezone": timezone,
+            "platform.date_format": dateFormat,
+          }))}
         >
           <div className="space-y-1">
             <FieldLabel label="Platform Name" />
@@ -288,14 +295,12 @@ export default function SettingsPage() {
           saving={notifSave.saving}
           saved={notifSave.saved}
           onSave={() => notifSave.save(() => patchSettings({
-            notifications: {
-              newUserRegistration: notifNewUser,
-              appointmentBooked: notifAppointment,
-              reminderAlerts: notifReminder,
-              communityReports: notifCommunity,
-              systemAlerts: notifSystem,
-              weeklySummary: notifWeekly,
-            },
+            "notifications.new_user_registration": String(notifNewUser),
+            "notifications.appointment_booked": String(notifAppointment),
+            "notifications.reminder_alerts": String(notifReminder),
+            "notifications.community_reports": String(notifCommunity),
+            "notifications.system_alerts": String(notifSystem),
+            "notifications.weekly_summary": String(notifWeekly),
           }))}
         >
           <ToggleRow label="New User Registration" enabled={notifNewUser} onChange={setNotifNewUser} />
@@ -313,8 +318,12 @@ export default function SettingsPage() {
           saving={langSave.saving}
           saved={langSave.saved}
           onSave={() => langSave.save(() => patchSettings({
-            defaultLanguage: defaultLang,
-            supportedLanguages: { English: langEnglish, Yoruba: langYoruba, Hausa: langHausa, Igbo: langIgbo, Pidgin: langPidgin },
+            "language.default": defaultLang,
+            "language.english": String(langEnglish),
+            "language.yoruba": String(langYoruba),
+            "language.hausa": String(langHausa),
+            "language.igbo": String(langIgbo),
+            "language.pidgin": String(langPidgin),
           }))}
         >
           <div className="space-y-1">
@@ -338,7 +347,9 @@ export default function SettingsPage() {
           saving={securitySave.saving}
           saved={securitySave.saved}
           onSave={() => securitySave.save(() => patchSettings({
-            security: { twoFactorAuth: twoFactor, loginAlerts, sessionTimeout },
+            "security.two_factor_authentication": String(twoFactor),
+            "security.login_alerts": String(loginAlerts),
+            "security.session_timeout_minutes": String(parseInt(sessionTimeout, 10) || 30),
           }))}
         >
           <ToggleRow label="Two-Factor Authentication" sub="Add extra security to your admin account" enabled={twoFactor} onChange={setTwoFactor} />
@@ -356,7 +367,9 @@ export default function SettingsPage() {
           saving={platformSave.saving}
           saved={platformSave.saved}
           onSave={() => platformSave.save(() => patchSettings({
-            platform: { maintenanceMode, allowUserRegistration: allowRegistration, emailVerification },
+            "platform.maintenance_mode": String(maintenanceMode),
+            "platform.allow_user_registration": String(allowRegistration),
+            "platform.email_verification_required": String(emailVerification),
           }))}
         >
           <ToggleRow label="Maintenance Mode" sub="Temporarily disable access to the platform." enabled={maintenanceMode} onChange={setMaintenanceMode} />
@@ -370,7 +383,9 @@ export default function SettingsPage() {
           icon={Database}
           saving={backupSave.saving}
           saved={backupSave.saved}
-          onSave={() => backupSave.save(() => patchSettings({ backup: { frequency: backupFrequency } }))}
+          onSave={() => backupSave.save(() => patchSettings({
+            "backup.frequency": backupFrequency.toLowerCase(),
+          }))}
         >
           <div className="space-y-1">
             <FieldLabel label="Backup Frequency" />

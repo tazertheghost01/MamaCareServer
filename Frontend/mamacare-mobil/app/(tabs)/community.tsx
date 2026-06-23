@@ -163,12 +163,18 @@ export default function CommunityScreen() {
 
   const handleAskQuestion = async () => {
     if (!questionText.trim()) return;
+    const groupId = groups[0]?.id;
+    if (!groupId) return;
     setSubmitting(true);
     try {
       const headers = await authHeaders();
       const res = await fetch(`${BASE_URL}/api/v1/community/questions`, {
         method: "POST", headers,
-        body: JSON.stringify({ title: questionText.trim() }),
+        body: JSON.stringify({
+          group_id: groupId,
+          title: questionText.trim(),
+          body: questionText.trim(),
+        }),
       });
       if (res.ok) {
         setShowAskModal(false);
@@ -202,7 +208,7 @@ export default function CommunityScreen() {
       const headers = await authHeaders();
       const res = await fetch(`${BASE_URL}/api/v1/community/discussions/${selectedDiscussion.id}/comments`, {
         method: "POST", headers,
-        body: JSON.stringify({ content: replyText.trim() }),
+        body: JSON.stringify({ body: replyText.trim() }),
       });
       if (res.ok) {
         setReplyText("");

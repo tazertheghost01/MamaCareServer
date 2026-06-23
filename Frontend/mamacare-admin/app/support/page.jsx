@@ -51,8 +51,20 @@ const QUICK_LINKS = [
   { label: "Contact Support Team", icon: Headphones, href: "#" },
 ];
 
-const TABS = ["All", "Open", "In Progress", "Resolved", "Closed"];
+const TABS = ["All", "Open", "In Progress", "Resolved"];
 const PAGE_SIZE = 10;
+
+const STATUS_LABELS = {
+  OPEN: "Open",
+  REVIEWING: "In Progress",
+  RESOLVED: "Resolved",
+};
+
+const TYPE_LABELS = {
+  FEEDBACK: "Feedback",
+  REPORT_ISSUE: "Bug",
+  CONTACT_US: "General",
+};
 
 const STATIC_FAQS = [
   "How do I reset my password?",
@@ -221,7 +233,14 @@ export default function SupportFeedbackPage() {
     })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => setTickets(
-        Array.isArray(data) ? data : data?.tickets || data?.content || []
+        (Array.isArray(data) ? data : data?.tickets || data?.content || []).map(ticket => ({
+          ...ticket,
+          status: STATUS_LABELS[ticket.status] || ticket.status || "Open",
+          category: TYPE_LABELS[ticket.type] || ticket.category || "General",
+          title: ticket.subject || ticket.title || "Support Request",
+          message: ticket.message || ticket.body || "",
+          createdAt: ticket.created_at || ticket.createdAt,
+        }))
       ))
       .catch(() => setError(true))
       .finally(() => setLoading(false));

@@ -20,19 +20,30 @@ public class AdminSettingsService {
 
     private static final Map<String, String> DEFAULTS = Map.ofEntries(
             Map.entry("platform.name", "MamaCare"),
+            Map.entry("platform.admin_email", "admin@mamacare.com"),
             Map.entry("platform.timezone", "Africa/Lagos"),
             Map.entry("platform.date_format", "MMM dd, yyyy"),
             Map.entry("notifications.new_user_registration", "true"),
             Map.entry("notifications.appointment_booked", "true"),
             Map.entry("notifications.reminder_alerts", "true"),
             Map.entry("notifications.community_reports", "true"),
+            Map.entry("notifications.system_alerts", "true"),
+            Map.entry("notifications.weekly_summary", "false"),
+            Map.entry("language.default", "English"),
+            Map.entry("language.english", "true"),
+            Map.entry("language.yoruba", "true"),
+            Map.entry("language.hausa", "true"),
+            Map.entry("language.igbo", "true"),
+            Map.entry("language.pidgin", "false"),
             Map.entry("security.two_factor_authentication", "false"),
             Map.entry("security.login_alerts", "true"),
             Map.entry("security.session_timeout_minutes", "30"),
             Map.entry("platform.maintenance_mode", "false"),
             Map.entry("platform.allow_user_registration", "true"),
             Map.entry("platform.email_verification_required", "true"),
-            Map.entry("backup.frequency", "daily")
+            Map.entry("backup.frequency", "daily"),
+            Map.entry("backup.status", "Completed"),
+            Map.entry("backup.last_backup", "n/a")
     );
 
     private final AdminSettingRepository settingRepository;

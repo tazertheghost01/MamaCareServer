@@ -51,11 +51,19 @@ export default function HelpScreen() {
     setSending(true);
     try {
       const headers = await authHeaders();
-      await fetch(`${BASE_URL}/api/v1/support/feedback`, {
+      const response = await fetch(`${BASE_URL}/api/v1/support/tickets`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ message: feedback.trim() }),
+        body: JSON.stringify({
+          type: "FEEDBACK",
+          subject: "User Feedback",
+          message: feedback.trim()
+        }),
       });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || data.detail || "Failed to send feedback.");
+      }
       setShowFeedbackModal(false);
       setFeedback("");
       showToast("Feedback sent! Thank you 💚");
