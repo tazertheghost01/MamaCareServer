@@ -75,14 +75,32 @@ export default function DashboardPage() {
     const token = localStorage.getItem("mc_token");
     if (!token) { setLoading(false); return; }
 
-    fetch(`${BASE_URL}/api/v1/home/summary`, {
+        fetch(`${BASE_URL}/api/v1/admin/dashboard`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
-        setSummary(data?.stats || data || null);
-        setRecentUsers(data?.recentUsers || []);
-        setActivity(data?.recentActivity || []);
+        // Map metrics to a dictionary for easy access
+        const metricMap = {};
+        (data?.metrics || []).forEach(m => {
+          metricMap[m.key] = m.value;
+        });
+        const mappedSummary = {
+          totalUsers: metricMap.total_users ?? "—",
+          activePregnancies: metricMap.active_pregnancies ?? "—",
+          appointments: metricMap.appointments ?? "—",
+          remindersSent: metricMap.reminders_sent ?? "—",
+          communityPosts: metricMap.community_posts ?? "—",
+          // Placeholder values for optional fields
+          growthData: [],
+          locationData: [],
+          totalUsersCount: metricMap.total_users ?? 0,
+        };
+        setSummary(mappedSummary);
+        const recentActivities = data?.recentActivities || [];
+        const recentUsers = recentActivities.filter(a => a.type === "USER");
+        setRecentUsers(recentUsers);
+        setActivity(recentActivities);
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));

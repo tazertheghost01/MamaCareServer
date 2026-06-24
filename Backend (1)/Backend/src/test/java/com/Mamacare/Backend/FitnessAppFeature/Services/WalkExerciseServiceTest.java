@@ -11,6 +11,7 @@ import com.Mamacare.Backend.FitnessAppFeature.Enums.WalkSessionStatus;
 import com.Mamacare.Backend.FitnessAppFeature.Enums.WalkSourcePlatform;
 import com.Mamacare.Backend.FitnessAppFeature.Repo.WalkGoalSettingRepo;
 import com.Mamacare.Backend.FitnessAppFeature.Repo.WalkSessionRepo;
+import com.Mamacare.Backend.DailyGoalsPackage.Services.DailyGoalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,9 +46,12 @@ class WalkExerciseServiceTest {
     @Mock
     private Authentication authentication;
 
+    @Mock
+    private DailyGoalService dailyGoalService;
+
     @BeforeEach
     void setUp() {
-        walkExerciseService = new WalkExerciseService(walkSessionRepository, walkGoalSettingRepository);
+        walkExerciseService = new WalkExerciseService(walkSessionRepository, walkGoalSettingRepository, dailyGoalService);
     }
 
     @Test

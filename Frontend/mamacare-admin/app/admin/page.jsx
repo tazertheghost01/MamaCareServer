@@ -1,10 +1,11 @@
-'use client';
+// app/admin/page.jsx
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 
-export default function Home() {
+export default function AdminRootRedirect() {
   const router = useRouter();
   useEffect(() => {
+    // If no token, go to login, otherwise to dashboard
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     if (token) {
       router.replace('/admin/dashboard');
@@ -12,5 +13,5 @@ export default function Home() {
       router.replace('/admin/login');
     }
   }, [router]);
-  return null;
+  return null; // No UI needed
 }

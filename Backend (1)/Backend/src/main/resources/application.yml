@@ -56,7 +56,7 @@ application:
       refresh-token:
         expiration: 604800000
 cors:
-  allowed-origins: "http://localhost:19006,http://localhost:8081,http://172.25.96.1:19006,http://172.25.96.1:8081,http://192.168.1.111:19006,http://192.168.1.111:8081,http://192.168.1.178:19006,http://192.168.1.178:8081,http://172.20.10.3:19006,http://172.20.10.3:8081"
+  allowed-origins: "http://localhost:19006,http://localhost:8081,http://172.25.96.1:19006,http://172.25.96.1:8081,http://192.168.1.111:19006,http://192.168.1.111:8081,http://192.168.1.178:19006,http://192.168.1.178:8081,http://172.20.10.3:19006,http://172.20.10.3:8081,http://localhost:3000,http://localhost:3001"
 
 community:
   copy:

@@ -18,5 +18,11 @@ public record DailyGoalResponse(
         boolean completed,
 
         @JsonProperty("completed_at")
-        Instant completedAt
+        Instant completedAt,
+
+        @JsonProperty("target_value")
+        int targetValue,
+
+        @JsonProperty("current_progress")
+        int currentProgress
 ) {}

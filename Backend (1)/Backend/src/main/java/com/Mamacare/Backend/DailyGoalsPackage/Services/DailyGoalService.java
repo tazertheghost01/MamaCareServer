@@ -107,6 +107,29 @@ public class DailyGoalService {
         dailyGoalRepository.save(goal);
     }
 
+    @Transactional
+    public void updateCategoryProgress(User user, DailyGoalCategory category, int currentProgress) {
+        LocalDate today = LocalDate.now();
+        List<DailyGoal> goals = dailyGoalRepository
+                .findByUserIdAndGoalDateAndActiveTrueOrderBySortOrderAscCreatedAtAsc(user.getId(), today);
+
+        // Find the goal with the specified category
+        for (DailyGoal goal : goals) {
+            if (goal.getCategory() == category && goal.getTargetValue() > 0) {
+                int newProgress = Math.max(goal.getCurrentProgress(), currentProgress);
+                goal.setCurrentProgress(newProgress);
+                
+                if (newProgress >= goal.getTargetValue() && !goal.isCompleted()) {
+                    goal.setCompleted(true);
+                    goal.setCompletedAt(Instant.now());
+                }
+                
+                dailyGoalRepository.save(goal);
+                return;
+            }
+        }
+    }
+
     private List<DailyGoal> defaultGoals(User user, LocalDate today) {
         List<DailyGoal> initialGoals = new java.util.ArrayList<>();
         
@@ -128,6 +151,7 @@ public class DailyGoalService {
                     .user(user)
                     .title(sysGoal.getTitle())
                     .category(sysGoal.getCategory())
+                    .targetValue(sysGoal.getTargetValue())
                     .goalDate(today)
                     .sortOrder(sortOrder)
                     .build());
@@ -151,7 +175,9 @@ public class DailyGoalService {
                 goal.getCategory(),
                 goal.getGoalDate(),
                 goal.isCompleted(),
-                goal.getCompletedAt()
+                goal.getCompletedAt(),
+                goal.getTargetValue(),
+                goal.getCurrentProgress()
         );
     }
 

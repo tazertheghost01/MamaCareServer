@@ -65,6 +65,14 @@ public class DailyGoal {
 
     private Instant completedAt;
 
+    @Column(name = "target_value", nullable = false)
+    @Builder.Default
+    private int targetValue = 0;
+
+    @Column(name = "current_progress", nullable = false)
+    @Builder.Default
+    private int currentProgress = 0;
+
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;

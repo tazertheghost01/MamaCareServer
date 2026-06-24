@@ -27,6 +27,18 @@ const DEFAULT_GOALS = [
   { id: "5", icon: "moon-outline", title: "Get enough rest", completed: false },
 ];
 
+const getGoalIcon = (category: string) => {
+  switch (category) {
+    case "HYDRATION": return "water-outline";
+    case "MEDICATION": return "medical-outline";
+    case "NUTRITION": return "restaurant-outline";
+    case "REST": return "moon-outline";
+    case "STRESS": return "heart-outline";
+    case "WALKING": return "walk-outline";
+    default: return "leaf-outline";
+  }
+};
+
 export default function MyGoalsScreen() {
   const [goalsData, setGoalsData] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
@@ -209,15 +221,31 @@ export default function MyGoalsScreen() {
                   width: 38, height: 38, borderRadius: 10,
                   backgroundColor: "#F0FAF4", alignItems: "center", justifyContent: "center",
                 }}>
-                  <Ionicons name={(goal.icon || "leaf-outline") as any} size={19} color="#2D7A4F" />
+                  <Ionicons name={getGoalIcon(goal.category) as any} size={19} color="#2D7A4F" />
                 </View>
-                <Text style={{
-                  flex: 1, fontSize: 14, fontWeight: "600",
-                  color: goal.completed ? "#AAA" : "#111",
-                  textDecorationLine: goal.completed ? "line-through" : "none",
-                }}>
-                  {goal.title}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{
+                    fontSize: 14, fontWeight: "600",
+                    color: goal.completed ? "#AAA" : "#111",
+                    textDecorationLine: goal.completed ? "line-through" : "none",
+                  }}>
+                    {goal.title}
+                  </Text>
+                  {goal.target_value > 0 && (
+                    <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <View style={{ height: 4, flex: 1, backgroundColor: "#EAEAEA", borderRadius: 2, overflow: "hidden" }}>
+                        <View style={{ 
+                          height: "100%", 
+                          width: `${Math.min(100, Math.round(((goal.current_progress || 0) / goal.target_value) * 100))}%`, 
+                          backgroundColor: goal.completed ? "#AAA" : "#2D7A4F", borderRadius: 2 
+                        }} />
+                      </View>
+                      <Text style={{ fontSize: 11, color: goal.completed ? "#AAA" : "#555", fontWeight: "600" }}>
+                        {goal.current_progress || 0} / {goal.target_value}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <View style={{
                   width: 24, height: 24, borderRadius: 6, borderWidth: 1.5,
                   borderColor: goal.completed ? "#2D7A4F" : "#DDD",

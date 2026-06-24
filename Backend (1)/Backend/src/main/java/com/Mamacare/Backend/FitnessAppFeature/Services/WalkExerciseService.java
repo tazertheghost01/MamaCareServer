@@ -13,6 +13,8 @@ import com.Mamacare.Backend.FitnessAppFeature.Enums.WalkSessionStatus;
 import com.Mamacare.Backend.FitnessAppFeature.Enums.WalkSourcePlatform;
 import com.Mamacare.Backend.FitnessAppFeature.Repo.WalkGoalSettingRepo;
 import com.Mamacare.Backend.FitnessAppFeature.Repo.WalkSessionRepo;
+import com.Mamacare.Backend.DailyGoalsPackage.Services.DailyGoalService;
+import com.Mamacare.Backend.DailyGoalsPackage.Enums.DailyGoalCategory;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -34,6 +36,7 @@ public class WalkExerciseService {
 
     private final WalkSessionRepo walkSessionRepository;
     private final WalkGoalSettingRepo walkGoalSettingRepository;
+    private final DailyGoalService dailyGoalService;
 
     @Transactional(readOnly = true)
     public WalkHomeResponse getHome(Authentication authentication) {
@@ -96,6 +99,11 @@ public class WalkExerciseService {
         User currentUser = getCurrentUser(authentication);
         WalkSession session = findSessionOwnedByUser(sessionId, currentUser.getId());
         applyMetrics(session, request);
+        
+        // Update Daily Goals with walking progress
+        int completedMinutes = session.getDurationSeconds() / 60;
+        dailyGoalService.updateCategoryProgress(currentUser, DailyGoalCategory.WALKING, completedMinutes);
+
         return toResponse(walkSessionRepository.save(session));
     }
 
@@ -110,6 +118,11 @@ public class WalkExerciseService {
         applyMetrics(session, request);
         session.setStatus(WalkSessionStatus.COMPLETED);
         session.setEndedAt(OffsetDateTime.now(ZoneId.of(session.getTimezone())));
+        
+        // Update Daily Goals with walking progress
+        int completedMinutes = session.getDurationSeconds() / 60;
+        dailyGoalService.updateCategoryProgress(currentUser, DailyGoalCategory.WALKING, completedMinutes);
+
         return toResponse(walkSessionRepository.save(session));
     }
 

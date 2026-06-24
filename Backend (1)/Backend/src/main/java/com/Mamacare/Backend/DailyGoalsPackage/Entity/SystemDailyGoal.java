@@ -42,4 +42,8 @@ public class SystemDailyGoal {
     @Column(nullable = false, length = 30)
     @Builder.Default
     private DailyGoalCategory category = DailyGoalCategory.CUSTOM;
+
+    @Column(name = "target_value", nullable = false)
+    @Builder.Default
+    private int targetValue = 0;
 }

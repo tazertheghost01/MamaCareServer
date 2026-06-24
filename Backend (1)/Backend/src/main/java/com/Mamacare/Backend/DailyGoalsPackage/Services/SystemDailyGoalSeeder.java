@@ -20,41 +20,22 @@ public class SystemDailyGoalSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (systemDailyGoalRepo.count() == 0) {
-            logger.info("Seeding initial System Daily Goals (Everyday defaults)...");
-            seedData();
-        } else {
-            logger.info("System Daily Goals already seeded.");
-        }
+        seedIfMissing(0, "Drink 8 glasses of water", DailyGoalCategory.HYDRATION, 0);
+        seedIfMissing(-1, "Eat healthy meals", DailyGoalCategory.NUTRITION, 0);
+        seedIfMissing(-2, "Get enough rest", DailyGoalCategory.REST, 0);
+        seedIfMissing(-3, "Manage stress", DailyGoalCategory.STRESS, 0);
+        seedIfMissing(-4, "Walk for 15 minutes", DailyGoalCategory.WALKING, 15);
     }
 
-    private void seedData() {
-        // pregnancyDay = 0 indicates it's an "Everyday" goal that applies to all days
-        
-        systemDailyGoalRepo.save(SystemDailyGoal.builder()
-                .pregnancyDay(0) // 0 used as a special marker for "every day"
-                .title("Drink 8 glasses of water")
-                .category(DailyGoalCategory.HYDRATION)
-                .build());
-
-        systemDailyGoalRepo.save(SystemDailyGoal.builder()
-                .pregnancyDay(-1) // using negative numbers to ensure unique pregnancy_day constraint
-                .title("Eat healthy meals")
-                .category(DailyGoalCategory.NUTRITION)
-                .build());
-
-        systemDailyGoalRepo.save(SystemDailyGoal.builder()
-                .pregnancyDay(-2)
-                .title("Get enough rest")
-                .category(DailyGoalCategory.REST)
-                .build());
-
-        systemDailyGoalRepo.save(SystemDailyGoal.builder()
-                .pregnancyDay(-3)
-                .title("Manage stress")
-                .category(DailyGoalCategory.STRESS)
-                .build());
-
-        logger.info("Successfully seeded System Daily Goals.");
+    private void seedIfMissing(int pregnancyDay, String title, DailyGoalCategory category, int targetValue) {
+        if (systemDailyGoalRepo.findByPregnancyDay(pregnancyDay).isEmpty()) {
+            logger.info("Seeding system daily goal for day {}: {}", pregnancyDay, title);
+            systemDailyGoalRepo.save(SystemDailyGoal.builder()
+                    .pregnancyDay(pregnancyDay)
+                    .title(title)
+                    .category(category)
+                    .targetValue(targetValue)
+                    .build());
+        }
     }
 }
