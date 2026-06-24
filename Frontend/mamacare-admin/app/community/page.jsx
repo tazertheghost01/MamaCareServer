@@ -111,6 +111,81 @@ const EmptyState = memo(function EmptyState({ message }) {
   );
 });
 
+// ---------- Add Post Modal ----------
+const AddPostModal = memo(function AddPostModal({ open, onClose, onPostSuccess }) {
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = useCallback(async () => {
+    if (!title.trim() && !content.trim()) return;
+    setSubmitting(true);
+    const token = localStorage.getItem("mc_token");
+    try {
+      const res = await fetch(`${BASE_URL}/api/v1/community/post`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ title: title.trim(), content: content.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed to create post");
+      // Assume server returns the created post; we don't need it here
+      onPostSuccess();
+      onClose();
+    } catch (e) {
+      console.error(e);
+      window.alert("Could not create post. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }, [title, content, onClose, onPostSuccess]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h3 className="font-bold text-gray-900">Add New Post</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400" aria-label="Close modal">✕</button>
+        </div>
+        <div className="p-6 space-y-4">
+          <input
+            type="text"
+            placeholder="Title"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none"
+            aria-label="Post title"
+          />
+          <textarea
+            placeholder="Content"
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none"
+            rows={4}
+            aria-label="Post content"
+          />
+        </div>
+        <div className="px-6 pb-6 flex gap-2 justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50"
+            aria-label="Cancel"
+          >Cancel</button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="px-4 py-2 rounded-xl bg-[#1A7A4A] text-white hover:bg-[#15633C] disabled:opacity-50"
+            aria-label="Submit post"
+          >{submitting ? "Posting…" : "Post"}</button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export default function CommunityPage() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -118,10 +193,14 @@ export default function CommunityPage() {
   const [activeTab, setActiveTab] = useState("All Posts");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
+  // New state for add‑post flow
+  const [showAddModal, setShowAddModal] = useState(false);
 
-  useEffect(() => {
+  // Fetch data – extracted for reuse (initial load & manual refresh)
+  const fetchData = useCallback(() => {
     const token = localStorage.getItem("mc_token");
     if (!token) { setLoading(false); return; }
+
     fetch(`${BASE_URL}/api/v1/community/home`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
@@ -135,6 +214,11 @@ export default function CommunityPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // Initial load
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleTabChange = useCallback((tab) => setActiveTab(tab), []);
   const handleSearchChange = useCallback((e) => setSearch(e.target.value), []);
@@ -156,6 +240,7 @@ export default function CommunityPage() {
   return (
     <>
       <DetailModal post={selected} onClose={handleCloseModal} />
+      <AddPostModal open={showAddModal} onClose={() => setShowAddModal(false)} onPostSuccess={fetchData} />
       <div className="space-y-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
@@ -175,18 +260,38 @@ export default function CommunityPage() {
           ))}
         </div>
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between bg-white rounded-2xl border border-gray-100 p-4">
+          {/* Tabs */}
           <div className="flex flex-wrap gap-2">
             {TAB_OPTIONS.map(tab => (
-              <button key={tab} onClick={() => handleTabChange(tab)} className={`${baseTabClass} ${activeTab === tab ? "bg-[#1A7A4A] text-white" : "text-gray-600 hover:bg-gray-100"}`} aria-label={`Show ${tab} posts`}>
+              <button
+                key={tab}
+                onClick={() => handleTabChange(tab)}
+                className={`${baseTabClass} ${activeTab === tab ? "bg-[#1A7A4A] text-white" : "text-gray-600 hover:bg-gray-100"}`}
+                aria-label={`Show ${tab} posts`}
+              >
                 {tab}
               </button>
             ))}
           </div>
+          {/* Refresh button */}
+          <button
+            onClick={fetchData}
+            className={`${baseTabClass} bg-[#1A7A4A] text-white`}
+            aria-label="Refresh community posts"
+          >
+            Refresh
+          </button>
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <div className="flex-1 sm:w-72 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 flex items-center">
               <input type="text" placeholder="Search posts..." value={search} onChange={handleSearchChange} className="bg-transparent outline-none text-sm flex-1 placeholder-gray-400" aria-label="Search posts" />
             </div>
-            <button className={baseActionBtn} aria-label="Add new post"><Plus size={16} /> Add New Post</button>
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className={baseActionBtn} 
+              aria-label="Add new post"
+            >
+              <Plus size={16} /> Add New Post
+            </button>
           </div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
