@@ -1,5 +1,5 @@
 import "./globals.css";
-import AdminLayout from "@/components/layout/AdminLayout";
+import ConditionalLayout from "@/components/layout/ConditionalLayout";
 
 export const metadata = {
   title: "MamaCare Admin",
@@ -10,7 +10,8 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <AdminLayout>{children}</AdminLayout>
+        {/* This wrapper decides whether to show AdminLayout or not */}
+        <ConditionalLayout>{children}</ConditionalLayout>
       </body>
     </html>
   );

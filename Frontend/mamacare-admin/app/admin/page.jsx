@@ -1,6 +1,7 @@
-// app/admin/page.jsx
-import { useEffect } from 'react';
-import { useRouter } from 'next/router';
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function AdminRootRedirect() {
   const router = useRouter();

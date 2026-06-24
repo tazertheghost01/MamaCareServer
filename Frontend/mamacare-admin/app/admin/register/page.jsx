@@ -1,7 +1,7 @@
-// app/admin/register/page.jsx
-import { useState } from 'react';
-import { useRouter } from 'next/router';
+"use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 export default function AdminRegisterPage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
