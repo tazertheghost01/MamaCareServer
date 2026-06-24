@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, Image, TouchableOpacity,
-  ScrollView, Dimensions, Modal, Animated,
+  ScrollView, Dimensions, Modal, Animated, Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -435,15 +435,7 @@ export default function HomeScreen() {
             <Ionicons name="menu-outline" size={26} color="#111" />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={async () => {
-              await Notifications.scheduleNotificationAsync({
-                content: {
-                  title: "MamaCare 💚",
-                  body: "You have new updates waiting for you!",
-                },
-                trigger: null,
-              });
-            }}
+            onPress={() => Alert.alert("MamaCare 💚", "You have new updates waiting for you!")}
             style={{ position: "relative" }}
           >
             <Ionicons name="notifications-outline" size={26} color="#111" />

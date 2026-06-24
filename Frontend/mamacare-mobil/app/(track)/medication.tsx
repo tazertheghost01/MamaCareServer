@@ -37,17 +37,18 @@ export default function MedicationScreen() {
       const res = await fetch(`${BASE_URL}/api/v1/medications/today`, { headers });
       if (res.ok) {
         const data = await res.json();
-        const list = data.medicationsDueToday || data || [];
-        setMeds(Array.isArray(list) ? list : []);
-        setTotalToday(data.totalMedicationsToday || list.length);
-        setTakenToday(data.medicationsTakenToday || 0);
+        const list = data.today_medications || [];
+        const allMeds = Array.isArray(list) ? list : [];
+        setMeds(allMeds);
+        setTotalToday(allMeds.length);
+        setTakenToday(allMeds.filter((m: any) => m.taken_today).length);
       }
     } catch (e) {}
     finally { setLoading(false); }
   };
 
   const markTaken = async (medId: number) => {
-    setMeds((prev) => prev.map((m) => (m.id === medId || m.medicationId === medId) ? { ...m, isTaken: true } : m));
+    setMeds((prev) => prev.map((m) => (m.id === medId) ? { ...m, taken_today: true } : m));
     setTakenToday((t) => t + 1);
     try {
       const headers = await authHeaders();
@@ -162,21 +163,21 @@ export default function MedicationScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 14, fontWeight: "700", color: "#111", marginBottom: 2 }}>
-                      {med.medicationName}
+                      {med.medicine_name}
                     </Text>
                     <Text style={{ fontSize: 12, color: "#888" }}>
-                      {med.dosage} · {formatTime(med.reminderTime)}
+                      {med.dose} · {med.display_time || formatTime(med.medication_time)}
                     </Text>
                     {med.notes && <Text style={{ fontSize: 11, color: "#AAA", marginTop: 2 }}>{med.notes}</Text>}
                   </View>
-                  {med.isTaken ? (
+                  {med.taken_today ? (
                     <View style={{ backgroundColor: "#E8F5EE", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 4 }}>
                       <Ionicons name="checkmark" size={14} color="#2D7A4F" />
                       <Text style={{ fontSize: 11, color: "#2D7A4F", fontWeight: "700" }}>Taken</Text>
                     </View>
                   ) : (
                     <TouchableOpacity
-                      onPress={() => markTaken(med.id || med.medicationId)}
+                      onPress={() => markTaken(med.id)}
                       style={{ backgroundColor: "#2D7A4F", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 }}
                     >
                       <Text style={{ fontSize: 11, color: "#fff", fontWeight: "700" }}>Mark Taken</Text>
@@ -202,7 +203,7 @@ export default function MedicationScreen() {
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 14, fontWeight: "700", color: "#111" }}>Medicine Reminder</Text>
             <Text style={{ fontSize: 12, color: "#888" }}>
-              {meds[0]?.reminderTime ? `We will remind you at ${formatTime(meds[0].reminderTime)} everyday` : "We will remind you at the set time everyday"}
+              {meds[0]?.reminder_text || (meds[0]?.medication_time ? `We will remind you at ${meds[0].display_time || formatTime(meds[0].medication_time)} everyday` : "We will remind you at the set time everyday")}
             </Text>
           </View>
           <Switch value={reminderEnabled} onValueChange={setReminderEnabled} trackColor={{ false: "#E0E0E0", true: "#2D7A4F" }} thumbColor="#fff" />

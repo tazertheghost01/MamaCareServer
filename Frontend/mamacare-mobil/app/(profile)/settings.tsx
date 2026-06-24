@@ -34,6 +34,11 @@ export default function SettingsScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Delete account state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
   const toastAnim = useRef(new Animated.Value(-100)).current;
   const [toastMsg, setToastMsg] = useState("");
   const [toastSuccess, setToastSuccess] = useState(false);
@@ -89,6 +94,40 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText.trim().toUpperCase() !== "DELETE") {
+      showToast("Please type DELETE to confirm.");
+      return;
+    }
+    setDeleting(true);
+    try {
+      const headers = await authHeaders();
+      const response = await fetch(`${BASE_URL}/api/v1/users/me`, {
+        method: "DELETE",
+        headers,
+      });
+      if (response.ok || response.status === 204) {
+        // Clear all local data
+        await SecureStore.deleteItemAsync("accessToken");
+        await SecureStore.deleteItemAsync("refreshToken");
+        await SecureStore.deleteItemAsync("firstName");
+        await SecureStore.deleteItemAsync("lastName");
+        await SecureStore.deleteItemAsync("dateMode");
+        await SecureStore.deleteItemAsync("dateValue");
+        await SecureStore.deleteItemAsync("pregnancyWeeks");
+        await SecureStore.deleteItemAsync("dueDate");
+        setShowDeleteModal(false);
+        router.replace("/onboard");
+      } else {
+        showToast("Failed to delete account. Please try again.");
+      }
+    } catch (e) {
+      showToast("No connection. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const PREFERENCES = [
     {
       icon: "notifications-outline",
@@ -133,7 +172,7 @@ export default function SettingsScreen() {
       icon: "trash-outline",
       title: "Delete Account",
       desc: "Permanently delete your account",
-      onPress: () => {},
+      onPress: () => { setDeleteConfirmText(""); setShowDeleteModal(true); },
       danger: true,
     },
   ];
@@ -153,6 +192,73 @@ export default function SettingsScreen() {
         <Ionicons name={toastSuccess ? "checkmark-circle-outline" : "alert-circle-outline"} size={20} color="#fff" />
         <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600", flex: 1 }}>{toastMsg}</Text>
       </Animated.View>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal visible={showDeleteModal} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", paddingHorizontal: 24 }}>
+          <View style={{ backgroundColor: "#fff", borderRadius: 20, padding: 28 }}>
+            {/* Icon */}
+            <View style={{ alignItems: "center", marginBottom: 16 }}>
+              <View style={{
+                width: 64, height: 64, borderRadius: 32,
+                backgroundColor: "#FFF0F0", alignItems: "center", justifyContent: "center", marginBottom: 12,
+              }}>
+                <Ionicons name="warning-outline" size={32} color="#E53935" />
+              </View>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: "#111", textAlign: "center" }}>
+                Delete Account?
+              </Text>
+              <Text style={{ fontSize: 13, color: "#666", textAlign: "center", marginTop: 8, lineHeight: 20 }}>
+                This will permanently delete your account and all your data. This action{" "}
+                <Text style={{ fontWeight: "700", color: "#E53935" }}>cannot be undone</Text>.
+              </Text>
+            </View>
+
+            {/* Type DELETE to confirm */}
+            <Text style={{ fontSize: 13, fontWeight: "600", color: "#444", marginBottom: 8, marginTop: 4 }}>
+              Type <Text style={{ color: "#E53935", fontWeight: "800" }}>DELETE</Text> to confirm:
+            </Text>
+            <TextInput
+              value={deleteConfirmText}
+              onChangeText={setDeleteConfirmText}
+              placeholder="Type DELETE here"
+              placeholderTextColor="#BDBDBD"
+              autoCapitalize="characters"
+              style={{
+                borderWidth: 1.5,
+                borderColor: deleteConfirmText.toUpperCase() === "DELETE" ? "#E53935" : "#EFEFEF",
+                borderRadius: 12, paddingHorizontal: 14, height: 50,
+                fontSize: 14, color: "#333", backgroundColor: "#FAFAFA",
+                marginBottom: 20,
+              }}
+            />
+
+            {/* Buttons */}
+            <TouchableOpacity
+              onPress={handleDeleteAccount}
+              disabled={deleting || deleteConfirmText.trim().toUpperCase() !== "DELETE"}
+              style={{
+                backgroundColor: deleteConfirmText.trim().toUpperCase() === "DELETE" ? "#E53935" : "#EEE",
+                borderRadius: 14, paddingVertical: 15, alignItems: "center", marginBottom: 10,
+              }}
+            >
+              {deleting
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={{
+                    color: deleteConfirmText.trim().toUpperCase() === "DELETE" ? "#fff" : "#AAA",
+                    fontWeight: "700", fontSize: 15,
+                  }}>Delete My Account</Text>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowDeleteModal(false)}
+              style={{ borderRadius: 14, paddingVertical: 13, alignItems: "center", borderWidth: 1.5, borderColor: "#DDD" }}
+            >
+              <Text style={{ color: "#555", fontWeight: "600", fontSize: 15 }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Language Modal */}
       <Modal visible={showLangModal} transparent animationType="slide">

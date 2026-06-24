@@ -35,12 +35,10 @@ export default function DueDateScreen() {
       const token = await SecureStore.getItemAsync("accessToken");
 
       // Build pregnancy setup payload
-      const payload: any = {};
-      if (isLMP) {
-        payload.lastMenstrualPeriod = date;
-      } else {
-        payload.dueDate = date;
-      }
+      // Backend requires `source` to be "DUE_DATE" or "LMP" (not null)
+      const payload: any = isLMP
+        ? { source: "LMP", lastMenstrualPeriod: date }
+        : { source: "DUE_DATE", dueDate: date };
 
       const response = await fetch(`${BASE_URL}/api/v1/pregnancy/setup`, {
         method: "POST",

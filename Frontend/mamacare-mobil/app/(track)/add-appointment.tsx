@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import {
-  View, Text, TouchableOpacity, ScrollView,
+  View, Text, TextInput, TouchableOpacity, ScrollView,
   Modal, ActivityIndicator, Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -22,8 +22,11 @@ const TYPE_LABELS: Record<string, string> = {
 };
 const REMINDER_OPTIONS = [
   { label: "On time", value: "ON_TIME" },
-  { label: "15 mins before", value: "FIFTEEN_MINUTES_BEFORE" },
-  { label: "30 mins before", value: "THIRTY_MINUTES_BEFORE" },
+  { label: "15 mins before", value: "FIFTEEN_MINS_BEFORE" },
+  { label: "30 mins before", value: "THIRTY_MINS_BEFORE" },
+  { label: "1 hour before", value: "ONE_HOUR_BEFORE" },
+  { label: "6 hours before", value: "SIX_HOURS_BEFORE" },
+  { label: "1 day before", value: "ONE_DAY_BEFORE" },
 ];
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -42,7 +45,7 @@ export default function AddAppointmentScreen() {
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [showLocationPicker, setShowLocationPicker] = useState(false);
+
   const [saving, setSaving] = useState(false);
 
   const toastAnim = useRef(new Animated.Value(-100)).current;
@@ -264,12 +267,29 @@ export default function AddAppointmentScreen() {
           />
 
           {/* Location */}
-          <FormRow
-            icon="location-outline"
-            label="Location"
-            value={form.location || "Federal Medical Center, Jabi, Abuja."}
-            onPress={() => setShowLocationPicker(true)}
-          />
+          <View style={{
+            flexDirection: "row", alignItems: "center", gap: 14,
+            backgroundColor: "#fff", borderRadius: 14, padding: 14,
+            borderWidth: 1, borderColor: !form.location.trim() ? "#F0F0F0" : "#F0F0F0",
+            shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+          }}>
+            <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: "#E8F5EE", alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="location-outline" size={19} color="#2D7A4F" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, color: "#888", marginBottom: 2 }}>Location</Text>
+              <TextInput
+                placeholder="e.g. Federal Medical Center, Jabi, Abuja"
+                placeholderTextColor="#BDBDBD"
+                value={form.location}
+                onChangeText={(v) => setForm({ ...form, location: v })}
+                style={{ fontSize: 14, fontWeight: "600", color: "#111", padding: 0, margin: 0 }}
+                autoCapitalize="sentences"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
 
           {/* Notes */}
           <FormRow
@@ -305,7 +325,7 @@ export default function AddAppointmentScreen() {
                 }} />
               </TouchableOpacity>
             </View>
-            <View style={{ flexDirection: "row", gap: 8 }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               {REMINDER_OPTIONS.map((opt) => (
                 <TouchableOpacity
                   key={opt.value}
