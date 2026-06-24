@@ -83,4 +83,33 @@ public class AdminLearnController {
 
         return ResponseEntity.ok(translationRepo.save(translation));
     }
+
+    @PutMapping("/cards/{cardId}")
+    public ResponseEntity<LearnCard> updateCard(
+            @PathVariable String cardId,
+            @RequestParam(required = false) LearnCategory category,
+            @RequestParam(required = false) Integer durationSeconds
+    ) {
+        Optional<LearnCard> cardOpt = learnCardRepo.findById(cardId);
+        if (cardOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        LearnCard card = cardOpt.get();
+        if (category != null) {
+            card.setCategory(category);
+        }
+        if (durationSeconds != null) {
+            card.setDurationSeconds(durationSeconds);
+        }
+        return ResponseEntity.ok(learnCardRepo.save(card));
+    }
+
+    @DeleteMapping("/cards/{cardId}")
+    public ResponseEntity<Void> deleteCard(@PathVariable String cardId) {
+        if (!learnCardRepo.existsById(cardId)) {
+            return ResponseEntity.notFound().build();
+        }
+        learnCardRepo.deleteById(cardId);
+        return ResponseEntity.noContent().build();
+    }
 }

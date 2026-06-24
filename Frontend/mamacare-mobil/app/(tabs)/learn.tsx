@@ -290,52 +290,56 @@ export default function LearnScreen() {
           ))}
         </ScrollView>
 
-        {/* Tips section */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-          <Text style={{ fontSize: 15, fontWeight: "700", color: "#111", marginBottom: 12 }}>{t("tips")}</Text>
-          <View style={{ gap: 10 }}>
-            {TIPS.map((tip) => (
-              <TouchableOpacity
-                key={tip.title}
-                style={{
-                  flexDirection: "row", alignItems: "center", gap: 14,
-                  backgroundColor: "#fff", borderRadius: 14, padding: 14,
-                  shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
-                }}
-              >
-                <View style={{
-                  width: 40, height: 40, borderRadius: 12,
-                  backgroundColor: "#F0FAF4", alignItems: "center", justifyContent: "center",
-                }}>
-                  <Ionicons name={tip.icon as any} size={20} color="#2D7A4F" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#111", marginBottom: 2 }}>
-                    {tip.title}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: "#888" }}>{tip.desc}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#CCC" />
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        {selectedCategory === "All" && (
+          <>
+            {/* Tips section */}
+            <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#111", marginBottom: 12 }}>{t("tips")}</Text>
+              <View style={{ gap: 10 }}>
+                {TIPS.map((tip) => (
+                  <TouchableOpacity
+                    key={tip.title}
+                    style={{
+                      flexDirection: "row", alignItems: "center", gap: 14,
+                      backgroundColor: "#fff", borderRadius: 14, padding: 14,
+                      shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+                    }}
+                  >
+                    <View style={{
+                      width: 40, height: 40, borderRadius: 12,
+                      backgroundColor: "#F0FAF4", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <Ionicons name={tip.icon as any} size={20} color="#2D7A4F" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#111", marginBottom: 2 }}>
+                        {tip.title}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: "#888" }}>{tip.desc}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color="#CCC" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
-        {/* Tip of the Day */}
-        <View style={{
-          marginHorizontal: 20, marginBottom: 20,
-          backgroundColor: "#F0FAF4", borderRadius: 16, padding: 16,
-          borderLeftWidth: 4, borderLeftColor: "#2D7A4F",
-        }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <Ionicons name="bulb-outline" size={18} color="#2D7A4F" />
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#2D7A4F" }}>{t("tips") + " " + t("days_to_go").substring(5)}</Text>
-          </View>
-          <Text style={{ fontSize: 13, color: "#555", lineHeight: 20 }}>
-            {learnItems && learnItems[0] ? learnItems[0].title : "Eat a variety of fruits and vegetables everyday."}
-          </Text>
-        </View>
+            {/* Tip of the Day */}
+            <View style={{
+              marginHorizontal: 20, marginBottom: 20,
+              backgroundColor: "#F0FAF4", borderRadius: 16, padding: 16,
+              borderLeftWidth: 4, borderLeftColor: "#2D7A4F",
+            }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <Ionicons name="bulb-outline" size={18} color="#2D7A4F" />
+                <Text style={{ fontSize: 13, fontWeight: "700", color: "#2D7A4F" }}>{t("tips") + " " + t("days_to_go").substring(5)}</Text>
+              </View>
+              <Text style={{ fontSize: 13, color: "#555", lineHeight: 20 }}>
+                {learnItems && learnItems[0] ? learnItems[0].title : "Eat a variety of fruits and vegetables everyday."}
+              </Text>
+            </View>
+          </>
+        )}
 
         {/* Learn & Listen list */}
         <View style={{ paddingHorizontal: 20 }}>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, Image, TouchableOpacity,
-  ScrollView, ActivityIndicator, Dimensions,
+  ScrollView, ActivityIndicator, Dimensions, Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,20 +26,86 @@ export default function AppointmentScreen() {
   const [loading, setLoading] = useState(true);
   const [appointment, setAppointment] = useState<any>(null);
   const [checklist, setChecklist] = useState(DEFAULT_CHECKLIST);
+  const [archiving, setArchiving] = useState(false);
+  const [archived, setArchived] = useState(false);
 
   useEffect(() => { loadAppointment(); }, []);
 
   const loadAppointment = async () => {
+    setLoading(true);
+    setArchived(false);
     try {
       const headers = await authHeaders();
       const res = await fetch(`${BASE_URL}/api/v1/appointments/upcoming/next`, { headers });
       if (res.ok) {
         const data = await res.json();
-        setAppointment(data);
-        if (data.checklistItems?.length) setChecklist(data.checklistItems);
+        if (data.has_upcoming_appointment && data.appointment) {
+          const appt = data.appointment;
+          setAppointment(appt);
+          if (appt.checklist?.length) {
+            setChecklist(appt.checklist.map((c: any) => ({
+              id: String(c.id),
+              itemName: c.text,
+              isCompleted: c.completed,
+            })));
+          } else {
+            setChecklist(DEFAULT_CHECKLIST);
+          }
+        } else {
+          setAppointment(null);
+          setChecklist(DEFAULT_CHECKLIST);
+        }
       }
     } catch (e) {}
     finally { setLoading(false); }
+  };
+
+  // Returns true if the appointment date+time is in the past
+  const isAppointmentPast = () => {
+    if (!appointment?.appointment_date || !appointment?.appointment_time) return false;
+    const [y, mo, d] = appointment.appointment_date.split("-").map(Number);
+    const [h, m] = appointment.appointment_time.split(":").map(Number);
+    const apptDateTime = new Date(y, mo - 1, d, h, m);
+    return apptDateTime < new Date();
+  };
+
+  const archiveAppointment = async (outcome: "done" | "not_done") => {
+    if (!appointment?.id) return;
+    setArchiving(true);
+    try {
+      const headers = await authHeaders();
+      const endpoint = outcome === "done" ? "complete" : "missed";
+      const res = await fetch(`${BASE_URL}/api/v1/appointments/${appointment.id}/${endpoint}`, {
+        method: "PATCH", headers,
+      });
+      if (res.ok) {
+        setArchived(true);
+        setAppointment(null);
+      }
+    } catch (e) {}
+    finally { setArchiving(false); }
+  };
+
+  const handleDone = () => {
+    Alert.alert(
+      "Great job! 🎉",
+      "Mark this appointment as completed?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Yes, Done!", onPress: () => archiveAppointment("done") },
+      ]
+    );
+  };
+
+  const handleNotDone = () => {
+    Alert.alert(
+      "Missed appointment",
+      "Mark this appointment as not attended?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Yes, Not Done", style: "destructive", onPress: () => archiveAppointment("not_done") },
+      ]
+    );
   };
 
   const toggleChecklist = async (itemId: string, current: boolean) => {
@@ -49,22 +115,28 @@ export default function AppointmentScreen() {
       const headers = await authHeaders();
       await fetch(`${BASE_URL}/api/v1/appointments/${appointment.id}/checklist/${itemId}`, {
         method: "PATCH", headers,
-        body: JSON.stringify({ isCompleted: !current }),
+        body: JSON.stringify({ completed: !current }),
       });
     } catch (e) {}
   };
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "--";
-    return new Date(dateStr).toLocaleDateString("en-NG", {
-      month: "long", day: "numeric", year: "numeric",
+    const [year, month, day] = dateStr.split("-").map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString("en-NG", {
+      weekday: "long", month: "long", day: "numeric", year: "numeric",
     });
   };
 
-  const formatTime = (dateStr: string) => {
-    if (!dateStr) return "--";
-    return new Date(dateStr).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
+  const formatTime = (timeStr: string) => {
+    if (!timeStr) return "--";
+    const [h, m] = timeStr.split(":").map(Number);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const hour = h % 12 || 12;
+    return `${String(hour).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
   };
+
+  const isPast = appointment ? isAppointmentPast() : false;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
@@ -118,11 +190,97 @@ export default function AppointmentScreen() {
         {/* Upcoming Appointment */}
         <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
           <Text style={{ fontSize: 15, fontWeight: "800", color: "#111", marginBottom: 12 }}>
-            Upcoming Appointment
+            {isPast ? "How did it go?" : "Upcoming Appointment"}
           </Text>
+
           {loading ? (
             <ActivityIndicator color="#2D7A4F" />
+          ) : archived ? (
+            /* Archived success state */
+            <View style={{
+              backgroundColor: "#F0FAF4", borderRadius: 16, padding: 24,
+              alignItems: "center", borderWidth: 1, borderColor: "#D4EDDA",
+            }}>
+              <Ionicons name="checkmark-circle" size={44} color="#2D7A4F" />
+              <Text style={{ fontSize: 15, color: "#2D7A4F", marginTop: 10, fontWeight: "700" }}>
+                Appointment archived
+              </Text>
+              <Text style={{ fontSize: 12, color: "#888", marginTop: 4, textAlign: "center" }}>
+                Well done! Add your next appointment below.
+              </Text>
+            </View>
+          ) : appointment && isPast ? (
+            /* Past appointment — Done / Not Done flow */
+            <View style={{
+              backgroundColor: "#fff", borderRadius: 16, padding: 16,
+              borderWidth: 1, borderColor: "#FFE0B2",
+              shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+            }}>
+              {/* Appointment details */}
+              <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
+                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "#FFF3E0", alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name="time-outline" size={22} color="#E65100" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: "#E65100", marginBottom: 2, fontWeight: "600" }}>Past Appointment</Text>
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: "#111", marginBottom: 2 }}>
+                    {appointment.appointment_type_label || "Appointment"}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: "#555", marginBottom: 4 }}>
+                    {formatDate(appointment.appointment_date)}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: "#888" }}>
+                    {formatTime(appointment.appointment_time)}
+                    {appointment.location_name ? `  ·  ${appointment.location_name}` : ""}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Divider */}
+              <View style={{ height: 1, backgroundColor: "#F5F5F5", marginBottom: 16 }} />
+
+              <Text style={{ fontSize: 13, color: "#555", marginBottom: 12, textAlign: "center" }}>
+                Did you attend this appointment?
+              </Text>
+
+              {/* Done / Not Done buttons */}
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity
+                  onPress={handleDone}
+                  disabled={archiving}
+                  style={{
+                    flex: 1, paddingVertical: 14, borderRadius: 14,
+                    backgroundColor: "#2D7A4F", alignItems: "center",
+                    flexDirection: "row", justifyContent: "center", gap: 6,
+                    opacity: archiving ? 0.6 : 1,
+                  }}
+                >
+                  <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Done ✓</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleNotDone}
+                  disabled={archiving}
+                  style={{
+                    flex: 1, paddingVertical: 14, borderRadius: 14,
+                    backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#E53935",
+                    alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6,
+                    opacity: archiving ? 0.6 : 1,
+                  }}
+                >
+                  <Ionicons name="close-circle-outline" size={18} color="#E53935" />
+                  <Text style={{ color: "#E53935", fontWeight: "700", fontSize: 14 }}>Not Done</Text>
+                </TouchableOpacity>
+              </View>
+
+              {archiving && (
+                <ActivityIndicator color="#2D7A4F" style={{ marginTop: 12 }} />
+              )}
+            </View>
           ) : appointment ? (
+            /* Upcoming appointment card */
             <View style={{
               backgroundColor: "#fff", borderRadius: 16, padding: 16,
               borderWidth: 1, borderColor: "#F0F0F0",
@@ -134,24 +292,26 @@ export default function AppointmentScreen() {
                   <Ionicons name="calendar-outline" size={22} color="#2D7A4F" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 12, color: "#888", marginBottom: 2 }}>Next Appointment</Text>
+                  <Text style={{ fontSize: 12, color: "#888", marginBottom: 2 }}>
+                    {appointment.appointment_type_label || "Next Appointment"}
+                  </Text>
                   <Text style={{ fontSize: 16, fontWeight: "800", color: "#111", marginBottom: 4 }}>
-                    {formatDate(appointment.appointmentDate)}
+                    {formatDate(appointment.appointment_date)}
                   </Text>
                   <Text style={{ fontSize: 14, color: "#555", marginBottom: 6 }}>
-                    {formatTime(appointment.appointmentDate)}
+                    {formatTime(appointment.appointment_time)}
                   </Text>
-                  {appointment.description && (
+                  {appointment.location_name && (
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                       <Ionicons name="location-outline" size={14} color="#888" />
-                      <Text style={{ fontSize: 12, color: "#888", flex: 1 }}>{appointment.description}</Text>
+                      <Text style={{ fontSize: 12, color: "#888", flex: 1 }}>{appointment.location_name}</Text>
                     </View>
                   )}
                 </View>
               </View>
 
               {/* Days to go */}
-              {appointment.daysUntilAppointment != null && (
+              {appointment.days_to_go != null && (
                 <View style={{
                   marginTop: 12, backgroundColor: "#F0FAF4", borderRadius: 12, padding: 12,
                   flexDirection: "row", alignItems: "center", gap: 10,
@@ -159,7 +319,7 @@ export default function AppointmentScreen() {
                   <Ionicons name="notifications-outline" size={18} color="#2D7A4F" />
                   <View>
                     <Text style={{ fontSize: 13, fontWeight: "700", color: "#2D7A4F" }}>
-                      {appointment.daysUntilAppointment} days to go
+                      {appointment.days_to_go === 0 ? "Today!" : `${appointment.days_to_go} day${appointment.days_to_go === 1 ? "" : "s"} to go`}
                     </Text>
                     <Text style={{ fontSize: 11, color: "#888" }}>
                       We'll send you a reminder before your appointment.
@@ -169,6 +329,7 @@ export default function AppointmentScreen() {
               )}
             </View>
           ) : (
+            /* No appointment */
             <View style={{
               backgroundColor: "#F8F8F8", borderRadius: 16, padding: 24,
               alignItems: "center", borderWidth: 1, borderColor: "#F0F0F0",

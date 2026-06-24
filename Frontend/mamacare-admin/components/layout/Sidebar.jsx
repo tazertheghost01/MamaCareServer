@@ -15,6 +15,8 @@ import {
   MessageCircleQuestion,
   LogOut,
   X,
+  Target,
+  BookOpen,
 } from "lucide-react";
 
 const navItems = [
@@ -25,6 +27,8 @@ const navItems = [
   { label: "Reminders", href: "/reminders", icon: Bell },
   { label: "Audio Library", href: "/audio-library", icon: Headphones },
   { label: "Community", href: "/community", icon: MessageSquare },
+  { label: "Daily Goals", href: "/daily-goals", icon: Target },
+  { label: "Learn Tips", href: "/learn-tips", icon: BookOpen },
   { label: "Reports & Analytics", href: "/analytics", icon: BarChart2 },
   { label: "Notifications", href: "/notifications", icon: BellRing },
   { label: "Settings", href: "/settings", icon: Settings },

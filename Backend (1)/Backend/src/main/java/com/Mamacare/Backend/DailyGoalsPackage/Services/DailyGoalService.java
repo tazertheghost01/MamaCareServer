@@ -8,6 +8,10 @@ import com.Mamacare.Backend.DailyGoalsPackage.Dto.UpdateDailyGoalRequest;
 import com.Mamacare.Backend.DailyGoalsPackage.Entity.DailyGoal;
 import com.Mamacare.Backend.DailyGoalsPackage.Enums.DailyGoalCategory;
 import com.Mamacare.Backend.DailyGoalsPackage.Repo.DailyGoalRepo;
+import com.Mamacare.Backend.DailyGoalsPackage.Repo.SystemDailyGoalRepo;
+import com.Mamacare.Backend.DailyGoalsPackage.Entity.SystemDailyGoal;
+import com.Mamacare.Backend.PregnancyCalculationPackage.Entity.PregnancyProfile;
+import com.Mamacare.Backend.PregnancyCalculationPackage.Repo.PregnancyProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,8 @@ import java.util.List;
 public class DailyGoalService {
 
     private final DailyGoalRepo dailyGoalRepository;
+    private final PregnancyProfileRepository profileRepository;
+    private final SystemDailyGoalRepo systemDailyGoalRepo;
 
     @Transactional
     public DailyGoalsHomeResponse getToday(Authentication authentication) {
@@ -102,40 +108,33 @@ public class DailyGoalService {
     }
 
     private List<DailyGoal> defaultGoals(User user, LocalDate today) {
-        return List.of(
-                DailyGoal.builder()
-                        .user(user)
-                        .title("Drink 8 glasses of water")
-                        .description("Drink enough water daily.")
-                        .category(DailyGoalCategory.HYDRATION)
-                        .goalDate(today)
-                        .sortOrder(10)
-                        .build(),
-                DailyGoal.builder()
-                        .user(user)
-                        .title("Eat healthy meals")
-                        .description("Eat healthy for you and your baby.")
-                        .category(DailyGoalCategory.NUTRITION)
-                        .goalDate(today)
-                        .sortOrder(20)
-                        .build(),
-                DailyGoal.builder()
-                        .user(user)
-                        .title("Get enough rest")
-                        .description("Good rest supports a healthy pregnancy.")
-                        .category(DailyGoalCategory.REST)
-                        .goalDate(today)
-                        .sortOrder(30)
-                        .build(),
-                DailyGoal.builder()
-                        .user(user)
-                        .title("Manage stress")
-                        .description("Stay calm and think positive.")
-                        .category(DailyGoalCategory.STRESS)
-                        .goalDate(today)
-                        .sortOrder(40)
-                        .build()
-        );
+        List<DailyGoal> initialGoals = new java.util.ArrayList<>();
+        
+        // Calculate pregnancy day to fetch system daily goal
+        int pregnancyDay = 1;
+        var profileOpt = profileRepository.findByUser(user);
+        if (profileOpt.isPresent()) {
+            PregnancyProfile profile = profileOpt.get();
+            long daysSinceLmp = java.time.temporal.ChronoUnit.DAYS.between(profile.getLastMenstrualPeriod(), today);
+            pregnancyDay = (int) daysSinceLmp + 1; // day 1 based
+        }
+        
+        // Fetch everyday goals (pregnancyDay <= 0) AND the specific pregnancy day goal
+        List<SystemDailyGoal> systemGoals = systemDailyGoalRepo.findByPregnancyDayLessThanEqualOrPregnancyDay(0, pregnancyDay);
+
+        int sortOrder = 10;
+        for (SystemDailyGoal sysGoal : systemGoals) {
+            initialGoals.add(DailyGoal.builder()
+                    .user(user)
+                    .title(sysGoal.getTitle())
+                    .category(sysGoal.getCategory())
+                    .goalDate(today)
+                    .sortOrder(sortOrder)
+                    .build());
+            sortOrder += 10;
+        }
+
+        return initialGoals;
     }
 
     private DailyGoal findGoal(Long goalId, Integer userId) {

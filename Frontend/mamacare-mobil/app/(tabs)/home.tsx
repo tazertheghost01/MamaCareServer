@@ -153,7 +153,12 @@ export default function HomeScreen() {
       const response = await fetch(`${BASE_URL}/api/v1/appointments/upcoming/next`, { headers });
       if (response.ok) {
         const data = await response.json();
-        setNextAppointment(data);
+        // API returns { has_upcoming_appointment, appointment: { ... } }
+        if (data.has_upcoming_appointment && data.appointment) {
+          setNextAppointment(data.appointment);
+        } else {
+          setNextAppointment(null);
+        }
       }
     } catch (e) {}
   };
@@ -164,7 +169,13 @@ export default function HomeScreen() {
       const response = await fetch(`${BASE_URL}/api/v1/medications/today`, { headers });
       if (response.ok) {
         const data = await response.json();
-        setTodayMeds(Array.isArray(data) ? data.slice(0, 3) : []);
+        // API returns { today_medications: [...], tips: [...] }
+        const meds = Array.isArray(data.today_medications)
+          ? data.today_medications
+          : Array.isArray(data)
+          ? data
+          : [];
+        setTodayMeds(meds.slice(0, 3));
       }
     } catch (e) {}
   };
@@ -331,42 +342,73 @@ export default function HomeScreen() {
   ];
 
   // ── Build reminders from API data ────────────────────
-  const reminders = [
-    nextAppointment ? {
-      icon: "calendar-outline",
-      title: nextAppointment.title || t("appointment", "Appointment"),
-      sub: nextAppointment.daysUntilAppointment != null
-        ? `${t("in", "In")} ${nextAppointment.daysUntilAppointment} ${t("days", "days")}`
-        : t("upcoming", "Upcoming"),
-      subColor: "#2D7A4F",
-      bg: "#F0FAF4",
-    } : {
-      icon: "calendar-outline",
-      title: t("antenatal_appointment"),
-      sub: t("no_upcoming"),
-      subColor: "#2D7A4F",
-      bg: "#F0FAF4",
-    },
-    todayMeds[0] ? {
-      icon: "medical-outline",
-      title: todayMeds[0].medicationName || t("medication"),
-      sub: todayMeds[0].reminderTime?.slice(0, 5) || t("today", "Today"),
-      subSub: t("daily_reminder", "Daily reminder"),
-      bg: "#FFF8F0",
-    } : {
-      icon: "medical-outline",
-      title: t("medication"),
-      sub: t("no_meds_today"),
-      bg: "#FFF8F0",
-    },
-    {
+  const buildReminders = () => {
+    const items: any[] = [];
+
+    // Appointment reminder
+    if (nextAppointment) {
+      const daysToGoAppt = nextAppointment.days_to_go;
+      items.push({
+        icon: "calendar-outline",
+        title: nextAppointment.appointment_type_label || "Appointment",
+        sub: daysToGoAppt != null
+          ? daysToGoAppt === 0 ? "Today!" : `In ${daysToGoAppt} day${daysToGoAppt === 1 ? "" : "s"}`
+          : nextAppointment.appointment_date || "Upcoming",
+        subColor: "#2D7A4F",
+        bg: "#F0FAF4",
+        route: "/(track)/appointment",
+      });
+    } else {
+      items.push({
+        icon: "calendar-outline",
+        title: "Appointment",
+        sub: "None scheduled",
+        subColor: "#AAA",
+        bg: "#F5F5F5",
+        empty: true,
+        route: "/(track)/appointment",
+      });
+    }
+
+    // Medication reminders — one card per med (up to 3)
+    if (todayMeds.length > 0) {
+      todayMeds.forEach((med: any) => {
+        items.push({
+          icon: med.taken_today ? "checkmark-circle-outline" : "medical-outline",
+          title: med.medicine_name || "Medication",
+          sub: med.display_time || (med.medication_time ? med.medication_time.slice(0, 5) : "Today"),
+          subColor: med.taken_today ? "#AAA" : "#D68000",
+          subSub: med.taken_today ? "Taken ✓" : med.dose || "",
+          bg: med.taken_today ? "#F5F5F5" : "#FFF8F0",
+          route: "/(track)/medication",
+        });
+      });
+    } else {
+      items.push({
+        icon: "medical-outline",
+        title: "Medication",
+        sub: "None today",
+        subColor: "#AAA",
+        bg: "#F5F5F5",
+        empty: true,
+        route: "/(track)/medication",
+      });
+    }
+
+    // Walk reminder — always shown
+    items.push({
       icon: "walk-outline",
       title: t("daily_walk"),
       sub: t("ten_min"),
       subSub: t("lets_move_gently"),
       bg: "#F0F4FF",
-    },
-  ];
+      route: "/(track)/walk",
+    });
+
+    return items;
+  };
+
+  const reminders = buildReminders();
 
   const trimesterKey = trimester === "1st Trimester" ? "1st" : trimester === "2nd Trimester" ? "2nd" : trimester === "3rd Trimester" ? "3rd" : null;
   const trimesterDisplay = trimesterKey ? t(`trimesters.${trimesterKey}` as any) : (trimester || "--");
@@ -519,34 +561,29 @@ export default function HomeScreen() {
             {reminders.map((r: any, i: number) => (
               <TouchableOpacity
                 key={i}
-                onPress={() => {
-                  if (r.title === t("daily_walk")) {
-                    router.push("/(track)/walk");
-                  } else {
-                    router.push("/(tabs)/track");
-                  }
-                }}
+                onPress={() => router.push(r.route || "/(tabs)/track")}
                 style={{
-                  width: 120, backgroundColor: "#fff", borderRadius: 16,
+                  width: 140, backgroundColor: "#fff", borderRadius: 16,
                   padding: 14, alignItems: "center",
                   shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+                  opacity: r.empty ? 0.7 : 1,
                 }}
               >
                 <View style={{
-                  width: 40, height: 40, borderRadius: 12,
+                  width: 44, height: 44, borderRadius: 14,
                   backgroundColor: r.bg, alignItems: "center", justifyContent: "center", marginBottom: 8,
                 }}>
-                  <Ionicons name={r.icon as any} size={20} color="#2D7A4F" />
+                  <Ionicons name={r.icon as any} size={22} color={r.empty ? "#CCC" : "#2D7A4F"} />
                 </View>
-                <Text style={{ fontSize: 12, fontWeight: "700", color: "#111", textAlign: "center", marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: r.empty ? "#AAA" : "#111", textAlign: "center", marginBottom: 6 }} numberOfLines={2}>
                   {r.title}
                 </Text>
                 <View style={{
-                  backgroundColor: r.subColor ? "#E8F5EE" : "#F5F5F5",
+                  backgroundColor: r.empty ? "#F0F0F0" : (r.subColor ? "#E8F5EE" : "#FFF0DC"),
                   borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3,
                 }}>
-                  <Text style={{ fontSize: 10, color: r.subColor || "#888", fontWeight: "600" }}>
+                  <Text style={{ fontSize: 10, color: r.empty ? "#BBB" : (r.subColor || "#D68000"), fontWeight: "600" }}>
                     {r.sub}
                   </Text>
                 </View>

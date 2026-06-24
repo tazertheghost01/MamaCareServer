@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, Image, TouchableOpacity,
-  ScrollView, Modal, TextInput, Dimensions,
+  ScrollView, Modal, TextInput, Dimensions, KeyboardAvoidingView, Platform
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -79,7 +79,7 @@ export default function MyGoalsScreen() {
       await fetch(`${BASE_URL}/api/v1/daily-goals`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ title: newGoal.trim(), category: "WELLNESS" }),
+        body: JSON.stringify({ title: newGoal.trim(), category: "CUSTOM" }),
       });
       await loadGoals(); // Reload fresh data
     } catch (e) { }
@@ -93,42 +93,48 @@ export default function MyGoalsScreen() {
 
       {/* Add Goal Modal */}
       <Modal visible={showModal} transparent animationType="slide">
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
-          <View style={{
-            backgroundColor: "#fff", borderTopLeftRadius: 24,
-            borderTopRightRadius: 24, padding: 24,
-          }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <Text style={{ fontSize: 17, fontWeight: "800", color: "#111" }}>Add New Goal</Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
-                <Ionicons name="close" size={24} color="#555" />
+        <KeyboardAvoidingView 
+          style={{ flex: 1 }} 
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
+            <View style={{
+              backgroundColor: "#fff", borderTopLeftRadius: 24,
+              borderTopRightRadius: 24, padding: 24,
+            }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <Text style={{ fontSize: 17, fontWeight: "800", color: "#111" }}>Add New Goal</Text>
+                <TouchableOpacity onPress={() => setShowModal(false)}>
+                  <Ionicons name="close" size={24} color="#555" />
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                placeholder="e.g. Drink more water"
+                placeholderTextColor="#BDBDBD"
+                value={newGoal}
+                onChangeText={setNewGoal}
+                autoFocus={true}
+                style={{
+                  borderWidth: 1, borderColor: "#EFEFEF", borderRadius: 12,
+                  backgroundColor: "#FAFAFA", paddingHorizontal: 16,
+                  height: 52, fontSize: 14, color: "#333", marginBottom: 16,
+                }}
+              />
+              <TouchableOpacity
+                onPress={addGoal}
+                disabled={saving}
+                style={{
+                  backgroundColor: "#2D7A4F", borderRadius: 14,
+                  paddingVertical: 15, alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
+                  {saving ? "Saving..." : "Save Goal"}
+                </Text>
               </TouchableOpacity>
             </View>
-            <TextInput
-              placeholder="e.g. Drink more water"
-              placeholderTextColor="#BDBDBD"
-              value={newGoal}
-              onChangeText={setNewGoal}
-              style={{
-                borderWidth: 1, borderColor: "#EFEFEF", borderRadius: 12,
-                backgroundColor: "#FAFAFA", paddingHorizontal: 16,
-                height: 52, fontSize: 14, color: "#333", marginBottom: 16,
-              }}
-            />
-            <TouchableOpacity
-              onPress={addGoal}
-              disabled={saving}
-              style={{
-                backgroundColor: "#2D7A4F", borderRadius: 14,
-                paddingVertical: 15, alignItems: "center",
-              }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
-                {saving ? "Saving..." : "Save Goal"}
-              </Text>
-            </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Header */}
@@ -203,7 +209,7 @@ export default function MyGoalsScreen() {
                   width: 38, height: 38, borderRadius: 10,
                   backgroundColor: "#F0FAF4", alignItems: "center", justifyContent: "center",
                 }}>
-                  <Ionicons name={goal.icon as any} size={19} color="#2D7A4F" />
+                  <Ionicons name={(goal.icon || "leaf-outline") as any} size={19} color="#2D7A4F" />
                 </View>
                 <Text style={{
                   flex: 1, fontSize: 14, fontWeight: "600",

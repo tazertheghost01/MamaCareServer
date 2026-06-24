@@ -198,6 +198,18 @@ public class AppointmentService {
     }
 
     @Transactional
+    public AppointmentResponse missAppointment(Long appointmentId, Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+        Appointment appointment = appointmentRepository
+                .findByIdAndUserId(appointmentId, currentUser.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Appointment not found."));
+
+        appointment.setStatus(AppointmentStatus.MISSED);
+        cancelPendingReminders(appointment);
+        return toResponse(appointmentRepository.save(appointment));
+    }
+
+    @Transactional
     public AppointmentResponse completeAppointment(Long appointmentId, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
         Appointment appointment = appointmentRepository
@@ -293,6 +305,9 @@ public class AppointmentService {
             case ONE_DAY_BEFORE -> scheduledStartAt.minusDays(1);
             case SIX_HOURS_BEFORE -> scheduledStartAt.minusHours(6);
             case ONE_HOUR_BEFORE -> scheduledStartAt.minusHours(1);
+            case THIRTY_MINS_BEFORE -> scheduledStartAt.minusMinutes(30);
+            case FIFTEEN_MINS_BEFORE -> scheduledStartAt.minusMinutes(15);
+            case ON_TIME -> scheduledStartAt;
         };
     }
 

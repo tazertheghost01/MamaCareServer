@@ -12,6 +12,8 @@ const PAGE_TITLES = {
   "/reminders": "Reminders",
   "/audio-library": "Audio Library",
   "/community": "Community",
+  "/daily-goals": "Daily Goals",
+  "/learn-tips": "Learn Tips",
   "/analytics": "Reports & Analytics",
   "/notifications": "Notifications",
   "/settings": "Settings",

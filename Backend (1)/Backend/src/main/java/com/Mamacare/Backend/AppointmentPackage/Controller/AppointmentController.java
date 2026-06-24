@@ -74,6 +74,14 @@ public class AppointmentController {
         return ResponseEntity.ok(appointmentService.cancelAppointment(appointmentId, authentication));
     }
 
+    @PatchMapping("/{appointmentId}/missed")
+    public ResponseEntity<AppointmentResponse> missAppointment(
+            @PathVariable Long appointmentId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(appointmentService.missAppointment(appointmentId, authentication));
+    }
+
     @PatchMapping("/{appointmentId}/complete")
     public ResponseEntity<AppointmentResponse> completeAppointment(
             @PathVariable Long appointmentId,
